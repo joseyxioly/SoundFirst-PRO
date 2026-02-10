@@ -44,7 +44,10 @@ This software is open source and free. We don't ask for anything, just that you 
 SoundFirst PRO is the work of a single person competing against industry giants.
 If this tool becomes your studio's "secret weapon", consider supporting its continued development. Your contribution ensures we keep mapping new plugins and refining the code, keeping this technology free for all.
 
-👉 **[Support Development / Buy a Coffee]** *buymeacoffee.com/soundfirstpro)*
+<a href="https://buymeacoffee.com/soundfirstpro" target="_blank">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="200">
+</a>
+
 
 ---
 
