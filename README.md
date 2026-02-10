@@ -33,7 +33,7 @@ This software is open source and free. We don't ask for anything, just that you 
 1.  **[Download Latest Version (Windows x64)]** *(See Releases tab)*
 2.  **Requirements:** 
     *   Windows 10/11 (64-bit)
-    *   Reaper 6.x / 7.x
+    *   Reaper 7.x
     *   SWS Extensions & OSARA (Mandatory).
 
 *Installation: Copy `reaper_soundfirst_pro.dll` to `%APPDATA%\REAPER\UserPlugins` and restart Reaper.*
@@ -44,7 +44,7 @@ This software is open source and free. We don't ask for anything, just that you 
 SoundFirst PRO is the work of a single person competing against industry giants.
 If this tool becomes your studio's "secret weapon", consider supporting its continued development. Your contribution ensures we keep mapping new plugins and refining the code, keeping this technology free for all.
 
-👉 **[Support Development / Buy a Coffee]** *(Add your link here)*
+👉 **[Support Development / Buy a Coffee]** *buymeacoffee.com/soundfirstpro)*
 
 ---
 
