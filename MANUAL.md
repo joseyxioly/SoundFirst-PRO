@@ -66,7 +66,8 @@ This manual explains how to use the SoundFirst PRO controller efficiently in **R
 
 ## 🎹 FX Mode (PLUGIN Button)
 - Activated by pressing the **PLUGIN** button.  
-- Allows deep control of effects on the selected track.
+- Allows deep control of effects on the selected track.  
+> 📘 **Workflow Guide:** Learn the [Unified VST Workflow here](VST_WORKFLOW.md).
 
 ### Knobs
 - Control mapped plugin parameters (native or Auto-Map).  

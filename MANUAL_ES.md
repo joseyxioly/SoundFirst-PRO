@@ -64,7 +64,8 @@ Este manual explica cómo usar el controlador SoundFirst PRO de manera eficiente
 
 ## 🎹 Modo FX (Botón PLUGIN)
 - Se activa pulsando el botón **PLUGIN**.  
-- Permite un control profundo de los efectos en la pista seleccionada.
+- Permite un control profundo de los efectos en la pista seleccionada.  
+> 📘 **Guía de Flujo:** Aprende el [Flujo de Trabajo Unificado aquí](VST_WORKFLOW.md) (en inglés).
 
 ### Perillas (Knobs)
 - Controlan parámetros mapeados del plugin (nativo o Auto-Map).  
