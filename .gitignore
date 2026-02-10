@@ -1,0 +1,34 @@
+# Build Folders
+build/
+out/
+bin/
+
+# Visual Studio / CMake artifacts
+.vs/
+*.user
+*.suo
+*.sdf
+*.opensdf
+CMakeCache.txt
+CMakeFiles/
+*.cmake
+*.log
+install_manifest.txt
+Makefile
+
+# Compiled Binaries (We will release these in Releases, not in source)
+*.dll
+*.exe
+*.lib
+*.pdb
+*.exp
+*.obj
+
+# System
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Logs
+*.txt
+recuerdos_*.md
