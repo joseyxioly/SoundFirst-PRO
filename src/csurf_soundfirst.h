@@ -136,10 +136,10 @@ private:
     std::thread m_hid_thread;
     std::atomic<bool> m_hid_running;
     HANDLE m_hid_handle;
-    struct HidEvent { unsigned char data[30]; };
+    struct HidEvent { unsigned char data[64]; };
     std::queue<HidEvent> m_hid_queue;
     std::mutex m_hid_mutex;
-    unsigned char m_last_hid_report[30];
+    unsigned char m_last_hid_report[64];
     int m_last_knob_values[8];
 
     // NHL Actions

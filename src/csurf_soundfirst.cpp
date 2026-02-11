@@ -277,18 +277,21 @@ std::string GetA61HidPath() {
                 char lMsg[512]; sprintf(lMsg, "[HID_SCAN] Found NI Device: %s", path.c_str());
                 RawLog(lMsg);
                 
-                // Prioritize user's actual hardware: PID 1750 / MI 02
-                if (matchPath.find("pid_1750") != std::string::npos) {
+                // Prioritize user's actual hardware: PID 1750 (A-Series) OR PID 1860 (M32) OR 1620 (Legacy?)
+                // Both use the same protocol (MI 02 for DAW control usually)
+                if (matchPath.find("pid_1750") != std::string::npos || 
+                    matchPath.find("pid_1860") != std::string::npos || 
+                    matchPath.find("pid_1620") != std::string::npos) {
+                    // Check for Interface 2 (DAW) or Interface 1/3 depending on model. 
+                    // We look for "mi_02" or just accept the first valid PID match if strict MI check fails.
                     if (matchPath.find("mi_02") != std::string::npos) {
                         bestMatch = path;
                         free(pDetail);
-                        break;
+                        // Stop at first good match to avoid ambiguity
+                        break; 
                     }
+                    // Fallback: If we see the PID but not "mi_02" (maybe mi_01?), keep it as candidate
                     if (bestMatch.empty()) bestMatch = path;
-                }
-                // Fallback to previous A61 model: PID 1620 / MI 03
-                else if (matchPath.find("pid_1620") != std::string::npos && bestMatch.empty()) {
-                    bestMatch = path;
                 }
             }
         }
@@ -323,16 +326,23 @@ void CSurf_SoundFirst::HidThreadLoop() {
             
             if (m_hid_handle == INVALID_HANDLE_VALUE) {
                 attempts++;
-                if (attempts == 3) SpeakText("Buscando Teclado");
+                if (attempts == 3) SpeakText("Searching for Keyboard");
                 std::this_thread::sleep_for(std::chrono::seconds(5));
                 continue;
             }
         }
-        unsigned char buf[64] = {0}; buf[0] = 0x01;
+        unsigned char buf[64] = {0}; 
         DWORD read = 0;
-        if (ReadFile(m_hid_handle, buf, 30, &read, NULL) && read >= 30) {
+        // Request 64 bytes (Maximum Report Size). A-Series sends 30, M32 sends ~38. 
+        // ReadFile will return what is available if we request enough.
+        if (ReadFile(m_hid_handle, buf, 64, &read, NULL) && read > 0) {
             std::lock_guard<std::mutex> lock(m_hid_mutex);
-            HidEvent ev; memcpy(ev.data, buf, 30);
+            // Ensure we don't overflow internal fixed buffer (64)
+            if (read > 64) read = 64; 
+            
+            HidEvent ev; 
+            memset(ev.data, 0, 64);
+            memcpy(ev.data, buf, read);
             m_hid_queue.push(ev);
         } else { CloseHandle(m_hid_handle); m_hid_handle = INVALID_HANDLE_VALUE; }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -404,7 +414,7 @@ void CSurf_SoundFirst::RunNhlAction(const char* key) {
 
     // Announce action if enabled
     if (m_announce_actions) {
-        std::string action_msg = "Acción " + val;
+        std::string action_msg = "Action " + val;
         SpeakText(action_msg.c_str());
     }
 
@@ -416,12 +426,12 @@ void CSurf_SoundFirst::RunNhlAction(const char* key) {
         // FX Page navigation
         else if (val == "@PAGE_UP") { 
             if (m_fx_page > 0) m_fx_page--; 
-            char m[64]; sprintf(m, "Página %d", m_fx_page+1); 
+            char m[64]; sprintf(m, "Page %d", m_fx_page+1); 
             SpeakText(m); 
         }
         else if (val == "@PAGE_DOWN") { 
             m_fx_page++; 
-            char m[64]; sprintf(m, "Página %d", m_fx_page+1); 
+            char m[64]; sprintf(m, "Page %d", m_fx_page+1); 
             SpeakText(m); 
         }
         
@@ -564,7 +574,7 @@ void CSurf_SoundFirst::HandleReportGR(const std::string& cmd) {
 
     // Use Selected Track (as we are in FX Mode covering Selected Track)
     MediaTrack* track = GetSelectedTrack(NULL, 0);
-    if (!track) { SpeakText("No hay pista seleccionada"); return; }
+    if (!track) { SpeakText("No track selected"); return; }
     
     // Read GainReduction_dB from FX
     char buf[256] = {0};
@@ -575,21 +585,21 @@ void CSurf_SoundFirst::HandleReportGR(const std::string& cmd) {
         try {
             double gr_db = std::stod(buf);
             if (gr_db == 0.0) {
-                 SpeakText("Sin reducción");
+                 SpeakText("No reduction");
             } else {
                  // GR is usually negative? Or positive reduction?
                  // Some plugins report -3.0. A61 usually displays +3.0 reduction.
                  // We'll read absolute value.
                  int gr_int = (int)round(fabs(gr_db));
-                 char msg[64]; sprintf(msg, "Reducción %d dB", gr_int);
+                 char msg[64]; sprintf(msg, "Reduction %d dB", gr_int);
                  SpeakText(msg);
             }
         } catch (...) {
-            SpeakText("Error valor GR");
+            SpeakText("GR Value Error");
         }
     } else {
         // Fallback: Check if it's a Waves plugin? They obscure GR.
-        SpeakText("Plugin no reporta GR");
+        SpeakText("Plugin reports no GR");
     }
 }
 
@@ -620,7 +630,7 @@ void CSurf_SoundFirst::ReportTrackPeak() {
         SpeakText(msg);
         LogDebug(msg);
     } else {
-        SpeakText("Sin señal");
+        SpeakText("No signal");
     }
 }
 
@@ -639,7 +649,7 @@ void CSurf_SoundFirst::UpdateBankFromSelectedTrack() {
         m_current_bank = new_bank;
         
         char msg[128];
-        sprintf(msg, "Banco %d (pistas %d-%d)", 
+        sprintf(msg, "Bank %d (tracks %d-%d)", 
                 m_current_bank + 1,
                 m_current_bank * 8 + 1,
                 m_current_bank * 8 + 8);
@@ -656,7 +666,7 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
     // --- VERIFIED A61 (PID 1750) GROUND TRUTH ---
     bool isShift = (data[1] & 0x01); m_shift_pressed = isShift;
 
-    if (memcmp(data, old, 30) != 0) {
+    if (memcmp(data, old, 64) != 0) {
         char hex[128]; char* p = hex;
         for (int i = 0; i < 8; i++) p += sprintf(p, "%02X ", data[i]);
         char fullMsg[256]; sprintf(fullMsg, "[A61_TRUTH] %s", hex);
@@ -671,7 +681,7 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
     // Confirmed: 0x02 is Scale. Ideas is 0x20.
     if ((data[1] & 0x02) && !(old[1] & 0x02)) { 
         Main_OnCommand(40026, 0); // Save project
-        SpeakText("Proyecto Guardado");
+        SpeakText("Project Saved");
     }
     
     // ARP -> Report Peak
@@ -698,12 +708,12 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
                  if (m_selected_fx_index >= 0) {
                      char cmd[32]; sprintf(cmd, ":%d", m_selected_fx_index);
                      HandleReportGR(std::string(cmd));
-                 } else SpeakText("No FX Seleccionado");
+                 } else SpeakText("No FX Selected");
              } else {
                  // Global: Toggle Auto-Solo
                  m_touch_auto_solo = !m_touch_auto_solo;
-                 if (m_touch_auto_solo) SpeakText("Auto-Solo Activado");
-                 else SpeakText("Auto-Solo Desactivado");
+                 if (m_touch_auto_solo) SpeakText("Auto-Solo On");
+                 else SpeakText("Auto-Solo Off");
              }
          }
     }
@@ -732,14 +742,14 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
                      SetMediaTrackInfo_Value(t1, "I_SOLO", 1); // Solo Track 1
                      Undo_EndBlock2(0, "Solo Reference", -1);
                      ref_solo_active = true;
-                     SpeakText("Referencia Solo");
+                     SpeakText("Reference Solo");
                  } else {
-                     SpeakText("No hay Pista 1");
+                     SpeakText("Track 1 not found");
                  }
              } else {
                  Main_OnCommand(40029, 0); // Undo (Restores previous solo state)
                  ref_solo_active = false;
-                 SpeakText("Restaurado");
+                 SpeakText("Restored");
              }
         }
     }
@@ -750,18 +760,18 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
              // User Request: Force 40012 (Cut)
              if (midi_editor) MIDIEditor_OnCommand(midi_editor, 40012);
              else Main_OnCommand(40012, 0); 
-             SpeakText("Cortar Eventos");
+             SpeakText("Cut Events");
         } else if (m_current_mode == MODE_AUDIO) {
             Main_OnCommand(40059, 0); // CUT Items
-            SpeakText("Cortar Items");
+            SpeakText("Cut Items");
         } else {
             // MIXER MODE: LOOP BUTTON -> TOGGLE REPEAT
             // User requested V1.2 behavior (Simple Toggle)
             Main_OnCommand(1068, 0); // Transport: Toggle loop
             // Feedback state?
             int state = GetToggleCommandState(1068);
-            if (state == 1) SpeakText("Loop Activado");
-            else SpeakText("Loop Desactivado");
+            if (state == 1) SpeakText("Loop Active");
+            else SpeakText("Loop Inactive");
         }
     }
     
@@ -771,10 +781,10 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
              // User Request: Force 40010 (Copy)
              if (midi_editor) MIDIEditor_OnCommand(midi_editor, 40010);
              else Main_OnCommand(40010, 0);
-             SpeakText("Copiar Eventos");
+             SpeakText("Copy Events");
         } else if (m_current_mode == MODE_AUDIO) {
             Main_OnCommand(40057, 0); // COPY Items
-            SpeakText("Copiar Items");
+            SpeakText("Copy Items");
         } else {
             Main_OnCommand(40364, 0); // METRO
         }
@@ -787,10 +797,10 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
              // User Request: Force 40011 (Paste)
              if (midi_editor) MIDIEditor_OnCommand(midi_editor, 40011);
              else Main_OnCommand(40011, 0);
-             SpeakText("Pegar Eventos");
+             SpeakText("Paste Events");
         } else if (m_current_mode == MODE_AUDIO) {
             Main_OnCommand(42398, 0); // PASTE Items
-            SpeakText("Pegar Items");
+            SpeakText("Paste Items");
         } else {
             Main_OnCommand(1134, 0); // TEMPO -> Tap Tempo
         }
@@ -823,23 +833,23 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
             
             if (map && m_fx_page < map->pages.size() - 1) {
                 m_fx_page++;
-                char m[64]; sprintf(m, "Pagina FX %d: %s", m_fx_page+1, map->pages[m_fx_page].name.c_str());
+                char m[64]; sprintf(m, "FX Page %d: %s", m_fx_page+1, map->pages[m_fx_page].name.c_str());
                 SpeakText(m);
             } else if (!map) {
                  // Auto-Map Unlimited Pages (Groups of 8)
                  m_fx_page++;
-                 char m[64]; sprintf(m, "Pagina Auto %d", m_fx_page+1);
+                 char m[64]; sprintf(m, "Auto Page %d", m_fx_page+1);
                  SpeakText(m);
             } else {
-                 SpeakText("Ultima Pagina");
+                 SpeakText("Last Page");
             }
         } 
         else if (m_current_mode == MODE_AUDIO) {
             Main_OnCommand(40012, 0); // Split Items
-            SpeakText("Dividir Item");
+            SpeakText("Split Item");
         } else if (m_current_mode == MODE_MIDI) {
              HWND midi_editor = MIDIEditor_GetActive();
-             if (!midi_editor) { Main_OnCommand(40012, 0); SpeakText("Dividir Item"); } 
+             if (!midi_editor) { Main_OnCommand(40012, 0); SpeakText("Split Item"); } 
              else Main_OnCommand(40294, 0); 
         } else {
             Main_OnCommand(40294, 0); // PRESET UP -> Arm Auto
@@ -858,19 +868,19 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
                  FXMapping* map = FXMappingRegistry::GetMapping(fxN);
                  std::string pName = (map && m_fx_page < map->pages.size()) ? map->pages[m_fx_page].name : "Auto";
                  
-                 char m[64]; sprintf(m, "Pagina FX %d: %s", m_fx_page+1, pName.c_str());
+                 char m[64]; sprintf(m, "FX Page %d: %s", m_fx_page+1, pName.c_str());
                  SpeakText(m);
              } else {
-                 SpeakText("Pagina 1");
+                 SpeakText("Page 1");
              }
         }
         else if (m_current_mode == MODE_MIDI) {
              HWND midi_editor = MIDIEditor_GetActive();
-             if (midi_editor) { Main_OnCommand(40667, 0); SpeakText("Borrar Eventos"); }
-             else { Main_OnCommand(NamedCommandLookup("_OSARA_REMOVE"), 0); SpeakText("Borrar Item"); }
+             if (midi_editor) { Main_OnCommand(40667, 0); SpeakText("Delete Events"); }
+             else { Main_OnCommand(NamedCommandLookup("_OSARA_REMOVE"), 0); SpeakText("Delete Item"); }
         } else if (m_current_mode == MODE_AUDIO) {
             Main_OnCommand(NamedCommandLookup("_OSARA_REMOVE"), 0); // Remove items/tracks
-            SpeakText("Borrar");
+            SpeakText("Delete");
         } else {
             Main_OnCommand(40298, 0); // Bypass FX Chain
         }
@@ -884,7 +894,7 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
              if (t && m_selected_fx_index >= 0) {
                  bool en = TrackFX_GetEnabled(t, m_selected_fx_index);
                  TrackFX_SetEnabled(t, m_selected_fx_index, !en);
-                 SpeakText(en ? "Bypass Activado" : "Bypass Desactivado"); // Checks OLD state, so !en is new state. 
+                 SpeakText(en ? "Bypass On" : "Bypass Off"); // Checks OLD state, so !en is new state. 
                  // Wait, en=true (Active) -> Set(!en) -> Disabled (Bypass ON).
                  // So if en was true, we just bypassed it. Correct.
              }
@@ -907,7 +917,7 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
     // BROWSER: Mode Selection
     if ((data[3] & 0x01) && !(old[3] & 0x01)) {
         m_browser_mode_selection = true;
-        SpeakText(("Modo " + m_available_modes[m_current_mode_idx]).c_str());
+        SpeakText(("Mode " + m_available_modes[m_current_mode_idx]).c_str());
     }
     
     // PLUGIN: FX Mode Directly
@@ -916,7 +926,7 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
         m_current_mode = MODE_FX;
         m_selected_fx_index = 0; 
         m_fx_page = 0; // RESET PAGE on Entry
-        SpeakText("Modo FX: Plugin Activo");
+        SpeakText("FX Mode: Plugin Active");
         
         // Announce current plugin name
         MediaTrack* t = GetSelectedTrack(NULL, 0);
@@ -930,7 +940,7 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
     if ((data[3] & 0x04) && !(old[3] & 0x04)) {
         m_browser_mode_selection = false;
         m_current_mode = MODE_MIXER;
-        SpeakText("Modo MIXER");
+        SpeakText("MIXER Mode");
     }
     
     // ENCODER NAVIGATION (Hardcoded)
@@ -965,7 +975,7 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
          } else {
              // Global: Prev Marker
              Main_OnCommand(40172, 0); 
-             SpeakText("Marcador Anterior");
+             SpeakText("Prev Marker");
          }
     }
     
@@ -991,7 +1001,7 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
          } else {
              // Global: Next Marker
              Main_OnCommand(40173, 0); 
-             SpeakText("Siguiente Marcador");
+             SpeakText("Next Marker");
          }
     }
 
@@ -1005,7 +1015,7 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
             else if (m_available_modes[m_current_mode_idx] == "FX") m_current_mode = MODE_FX;
             else if (m_available_modes[m_current_mode_idx] == "MIDI") m_current_mode = MODE_MIDI;
             else if (m_available_modes[m_current_mode_idx] == "AUDIO") m_current_mode = MODE_AUDIO;
-             SpeakText(("Modo confirmado: " + m_available_modes[m_current_mode_idx]).c_str());
+             SpeakText(("Mode confirmed: " + m_available_modes[m_current_mode_idx]).c_str());
         } else {
             // Normal Click
             if (m_current_mode == MODE_FX) {
@@ -1045,7 +1055,7 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
                  else Main_OnCommand(40153, 0);     // Open MIDI Editor (Global)
             } else {
                  Main_OnCommand(40157, 0); // Insert Marker
-                 SpeakText("Marcador Insertado");
+                 SpeakText("Marker Inserted");
             }
         }
     }
@@ -1121,7 +1131,7 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
         m_last_knob_values[i] = val;
     }
 
-    memcpy(m_last_hid_report, data, 30);
+    memcpy(m_last_hid_report, data, 64);
 }
 
 
@@ -1140,7 +1150,7 @@ void CSurf_SoundFirst::HandleEncoderRotation(int delta) {
         }
         
         // Announce mode
-        SpeakText(("Modo " + m_available_modes[m_current_mode_idx]).c_str());
+        SpeakText(("Mode " + m_available_modes[m_current_mode_idx]).c_str());
     } else {
         // NORMAL MODE: Hardcoded Actions
         if (m_shift_pressed) {
@@ -1317,7 +1327,7 @@ void CSurf_SoundFirst::HandleKnob_Audio(int idx, int d) {
                   SetMediaItemInfo_Value(item, "D_FADEINLEN", len);
              }
          }
-         if (num_sel == 0) SpeakText("Selecciona un Item");
+         if (num_sel == 0) SpeakText("Select an Item");
          else UpdateTimeline(); // Redraw
     }
     else if (idx == 6) { // Fade Out (Native - No SWS Required)
@@ -1331,7 +1341,7 @@ void CSurf_SoundFirst::HandleKnob_Audio(int idx, int d) {
                   SetMediaItemInfo_Value(item, "D_FADEOUTLEN", len);
              }
          }
-         if (num_sel == 0) SpeakText("Selecciona un Item");
+         if (num_sel == 0) SpeakText("Select an Item");
          else UpdateTimeline();
     }
     else if (idx == 7) { // Zoom
@@ -1429,7 +1439,7 @@ void CSurf_SoundFirst::DumpCurrentFX() {
                 if (h) { memcpy(GlobalLock(h), ss.str().c_str(), ss.str().size() + 1); GlobalUnlock(h); SetClipboardData(CF_TEXT, h); }
                 CloseClipboard();
             }
-            SpeakText("Dump copiado");
+            SpeakText("Dump copied");
         }
     }
 }
