@@ -1,7 +1,9 @@
-# SoundFirst PRO - Controller
+# SoundFirst PRO
 ![SoundFirst PRO Logo](logo.png)
 
 **The "Sound-First" Evolution.**
+
+Leerlo en español: documents/README_ES.md
 
 ### Born from Necessity
 This project was born from a real need. Its creator, a blind producer with limited economic resources to access expensive accessibility hardware, decided not to surrender to barriers. Instead, he created his own workflow to level the playing field.
