@@ -3,7 +3,6 @@
 
 **The "Sound-First" Evolution.**
 
-Leerlo en español: documents/README_ES.md
 
 ### Born from Necessity
 This project was born from a real need. Its creator, a blind producer with limited economic resources to access expensive accessibility hardware, decided not to surrender to barriers. Instead, he created his own workflow to level the playing field.
@@ -45,9 +44,9 @@ However, if you appreciate this work and it improves your workflow, please consi
 ### Full Documentation
 For a complete reference of every button, mode, and hidden function:
 
-👉 **[READ THE USER MANUAL (MANUAL.md)](MANUAL.md)**
-👉 **[EASY MAPPING GUIDE (MAPPING_GUIDE.md)](MAPPING_GUIDE.md)**
+👉 **[READ THE USER MANUAL (MANUAL.md)](documents/MANUAL.md)**
+👉 **[EASY MAPPING GUIDE (MAPPING_GUIDE.md)](documents/MAPPING_GUIDE.md)**
 
 ---
 
-*([Leer en Español](README_ES.md))* | *(© 2026 José Pérez. Licensed under GNU GPL v3 - Power to the creators.)*
+[Leer en Español](documents/README_ES.md) | © 2026 José Pérez. Licensed under GNU GPL v3.
