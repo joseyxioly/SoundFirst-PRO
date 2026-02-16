@@ -1,74 +1,68 @@
 # SoundFirst PRO - Guía de Mapeo Fácil
-*Mapea cualquier plugin en segundos, sin código.*
+*Mapea cualquier plugin en segundos, sin necesidad de programar.*
+
+---
 
 ## El Concepto
-SoundFirst PRO te permite controlar cualquier plugin VST/AU/CLAP con tu hardware Komplete Kontrol.
-Para hacer esto, creamos archivos `.ini` simples que le dicen al driver: *"La Perilla 1 controla el Cutoff"*.
+SoundFirst PRO convierte tu Komplete Kontrol en un **controlador universal para cualquier plugin** VST/AU/CLAP.  
+Usamos archivos `.ini` simples que indican al driver: *“La Perilla 1 controla Cutoff”*.  
 
-Hemos construido una herramienta especial llamada **SoundFirst PRO Mapper** para hacer esto instantáneo.
-
-### Dónde Encontrar la Herramienta
-*   **Ejecutable (.exe):** Descarga el último `SoundFirst_PRO_Mapper.exe` desde la sección de **[Releases](https://github.com/tu_usuario/tu_repo/releases)** de este repositorio.
-*   **Código Fuente:** El código fuente completo en Python está disponible en la carpeta `tools/` de este proyecto.
-
-### Comunidad y Soporte
-¿Necesitas ayuda para mapear? ¿O quieres compartir tus mapas?
-👉 **[Contáctame en Telegram](https://t.me/JoseyXioly)**
-👉 **[Apoyar el Desarrollo / Comprame un Café](https://buymeacoffee.com/soundfirstpro)**
+La herramienta **SoundFirst PRO Mapper** hace que crear estos mapas sea instantáneo y visual, sin tocar código.
 
 ---
 
----
-
-## Paso 1: Obtener los Parámetros
-Primero, necesitamos saber qué parámetros tiene tu plugin.
-
-1.  Abre Reaper y agrega el plugin que quieres mapear (ej: *Serum* o *Pro-Q3*) a una pista.
-2.  Asegúrate de que la ventana del plugin esté enfocada (haz click en ella).
-3.  Abre la Lista de Acciones (`?`) y ejecuta **"Script: dump_fx_params.lua"**.
-    *   *Tip: ¡Asigna un atajo como `Ctrl+Shift+D` a este script!*
-4.  Un mensaje confirmará: **"Parameters copied to clipboard!"**.
+## Dónde Encontrar la Herramienta
+* **Ejecutable (.exe):** Descarga el mapeador desde la sección de **[Releases](https://github.com/joseyxioly/SoundFirst-PRO/releases)**.  
+* **Código fuente:** El código en Python está en la carpeta `tools/` del proyecto.
 
 ---
 
-## Paso 2: La Herramienta Mapper
-Ahora, abre la herramienta **SoundFirst PRO Mapper** incluida en la carpeta de descarga (`run_fx_mapper.cmd`).
+## Comunidad y Soporte
+¿Tienes dudas o quieres compartir tus mapas?  
+📢 [Únete al grupo de discusión en Telegram](https://t.me/SoundFirstPRO)  
+☕ [Apoya el desarrollo / Cómprame un Café](https://buymeacoffee.com/soundfirstpro)
 
-1.  **Seleccionar Acción:** Elige **"Create New Mapping"**.
-2.  **Pegar:** Haz click en "Next". La herramienta leerá automáticamente el portapapeles del Paso 1.
-3.  **Wizard:** Ahora estás en el editor gráfico.
+---
+
+## Paso 1: Obtener los Parámetros del Plugin
+1. Abre Reaper y agrega tu plugin a una pista (ej: *Serum* o *Pro‑Q3*).  
+2. Haz click en la ventana del plugin para enfocarla.  
+3. Abre la **Lista de Acciones** (`?`) y ejecuta **“Script: dump_fx_params.lua”**.  
+   *Tip: asigna un atajo, por ejemplo `Ctrl+Shift+D`.*  
+4. Copia el resultado al portapapeles (`Ctrl+C`).
+
+---
+
+## Paso 2: Abrir SoundFirst PRO Mapper
+1. Ejecuta el archivo `SoundFirst_PRO_Mapper.exe`.  
+2. Haz click en **“Create New Mapping”**.  
+3. Pega el dump copiado del Paso 1 en la ventana que aparece y pulsa **“Next”**.  
+4. Ya estás en el editor gráfico.
 
 ### Cómo Mapear
-La interfaz está diseñada para la velocidad:
+El editor tiene 3 columnas:
 
-*   **Columna Izquierda (Controles):** Selecciona la Perilla o Botón en tu hardware.
-    *   *Ejemplo: Selecciona "Knob 1".*
-*   **Columna Central (Parámetros):** Busca el parámetro que quieres.
-    *   *Ejemplo: Escribe "Cutoff".*
-*   **Asignar:** Presiona **ENTER**.
-    *   ¡Listo! La Perilla 1 ahora está vinculada al Cutoff.
-    *   La selección salta automáticamente a "Knob 2" para que puedas seguir mapeando sin tocar el ratón.
+1.  **Columna Izquierda (Controles):** Selecciona la perilla o botón de tu hardware.
+    *   *Opcional:* Marca **Shift** para la capa secundaria o **Touch** para acción al tocar (ej. Auto-Solo).
+2.  **Columna Central (Parámetros):** Busca el parámetro que quieres controlar.
+    *   *Ejemplo: escribe “Cutoff” en la caja de búsqueda.*
+3.  **Asignar:** Presiona **“Assign (Enter)”** o simplemente la tecla **ENTER**.
+    *   *La selección salta automáticamente al siguiente control para mapear rápido.*
 
 ### Funciones Avanzadas
-*   **Páginas:** Puedes agregar múltiples páginas de controles (Página 1, Página 2...). Usa el botón "Add Page".
-*   **Etiquetas Personalizadas:** Puedes renombrar parámetros para que aparezcan mejor en la pantalla (ej: "FiltFreq" en lugar de "Filter Frequency A").
-*   **Específicos del Modo:**
-    *   **Strip (Touch):** Si mapeas un parámetro a "Touch", tocar la perilla activará el Auto-Solo para esa banda.
+- **Páginas:** Usa la columna derecha para **Add Page** (Añadir Página) si necesitas más de 8 perillas.
+- **Click Derecho** en una página para renombrarla o reordenarla.
 
 ---
 
-## Paso 3: Guardar y Tocar
-1.  Haz click en **"Save Mapping"**.
-2.  La herramienta sugerirá un nombre de archivo (ej: `Serum.ini`). **No cambies este nombre** a menos que sea necesario, ya que el driver lo necesita para reconocer el plugin.
-3.  Guárdalo en tu carpeta `UserPlugins\FX_Mappings`.
-4.  **Reinicia Reaper** (o recarga el driver).
+## Paso 3: Guardar y Usar
+1. Haz click en **“Save Mapping”**.  
+2. La herramienta sugerirá un nombre de archivo (ej: `Serum.ini`). **No lo cambies** salvo que sea necesario.  
+3. Guarda el archivo en la carpeta que se abre por defecto (`.../UserPlugins/SoundFirst_Maps`).
 
-La próxima vez que abras ese plugin, SoundFirst PRO cambiará automáticamente a **Modo Complemento** y tus perillas funcionarán al instante.
+> La próxima vez que abras ese plugin, SoundFirst PRO cambiará automáticamente a **Modo Complemento** y tus perillas funcionarán al instante.  
+> ⚠️ **Nota:** No necesitas reiniciar Reaper; el driver lee los mapas dinámicamente.
 
 ---
 
-## ¿Dónde pongo los archivos?
-*   **Windows:** `%APPDATA%\REAPER\UserPlugins\FX_Mappings\`
-*   **Mac:** `~/Library/Application Support/REAPER/UserPlugins/FX_Mappings/`
-
-*¡Feliz Mapeo!*
+*¡Feliz mapeo y a producir como un profesional!*

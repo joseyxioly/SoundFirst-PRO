@@ -17,26 +17,219 @@ struct FXPage {
 
 struct FXMapping {
     std::string plugin_name_signature; // e.g. "Lindell 50"
-    std::vector<FXPage> pages;
+    std::vector<FXPage> pages; 
+    std::map<unsigned char, std::string> buttons; // Key: Button ID (e.g. 0x01 Loop), Value: Action String (e.g. "12" or "@REPORT_PEAK")
+};
+
+// Button IDs (NHL Command IDs)
+enum MappableButton {
+    BTN_LOOP=0, BTN_METRO, BTN_TEMPO, 
+    BTN_IDEAS, BTN_QUANTIZE, BTN_AUTO,
+    BTN_MUTE, BTN_SOLO
+    // UNDO Removed
 };
 
 // Global Registry
 class FXMappingRegistry {
 public:
     static FXMapping* GetMapping(const char* fx_name) {
-        static std::vector<FXMapping> mappings;
-        if (mappings.empty()) InitializeMappings(mappings);
+        static std::map<std::string, FXMapping*> cache;
+        std::string sName = fx_name;
         
-        std::string name = fx_name;
-        for (auto& m : mappings) {
-            if (name.find(m.plugin_name_signature) != std::string::npos) {
-                return &m;
+        // 1. Check Cache
+        if (cache.count(sName)) return cache[sName];
+        
+        // 2. Try Loading from File (Highest Priority: User Overrides)
+        FXMapping* fileMap = LoadMappingFromFile(sName);
+        if (fileMap) {
+            cache[sName] = fileMap;
+            return fileMap;
+        }
+
+        // 2b. Try Simplified Name (e.g. "VST3: CLA-2A (Waves)" -> "CLA-2A")
+        std::string simpleName = GetSimplifiedName(sName);
+        if (simpleName != sName && !simpleName.empty()) {
+             fileMap = LoadMappingFromFile(simpleName);
+             if (fileMap) {
+                 // VERIFICATION: Does the loaded map actually belong to this plugin?
+                 // If the INI has [Main] PluginName=..., it should match sName.
+                 // If not present (legacy), we assume it's okay (user mapped it manually).
+                 if (!fileMap->plugin_name_signature.empty() && fileMap->plugin_name_signature != sName) {
+                     // Mismatch! e.g. Loaded "CLA-2A.ini" (for Waves) but sName is "CLA-2A (BlackRooster)"
+                     // Reject it.
+                     delete fileMap;
+                 } else {
+                     cache[sName] = fileMap; // Store under original name
+                     return fileMap;
+                 }
+             }
+        }
+
+        // 3. Fallback to Factory Defaults (Hardcoded)
+        static std::vector<FXMapping> factory_mappings;
+        if (factory_mappings.empty()) InitializeMappings(factory_mappings);
+        
+        for (auto& m : factory_mappings) {
+            // Factory lookup is fuzzy (signature match)
+            if (sName.find(m.plugin_name_signature) != std::string::npos) {
+                FXMapping* copy = new FXMapping(m);
+                cache[sName] = copy;
+                return copy;
             }
         }
+        
+        // 4. No Map found (return nullptr -> Auto-Map)
+        cache[sName] = nullptr; 
         return nullptr;
     }
 
 private:
+    // Helper: Sanitize plugin name for filename
+    static std::string SanitizeName(std::string name) {
+        // Simple sanitization: Keep alphanumeric, spaces, dashes suitable for filename
+        // Replace invalid chars with '_'
+        for (char &c : name) {
+            if (!isalnum((unsigned char)c) && c != ' ' && c != '-' && c != '_' && c != '.' && c != '(' && c != ')') {
+                c = '_';
+            }
+        }
+        // Trim spaces
+        size_t first = name.find_first_not_of(' ');
+        if (std::string::npos == first) return name;
+        size_t last = name.find_last_not_of(' ');
+        return name.substr(first, (last - first + 1));
+    }
+
+    static std::string GetSimplifiedName(std::string name) {
+        // 1. Remove Prefix (VST3:, VST:, JS:, AU:, CLAP:)
+        size_t colon = name.find(':');
+        if (colon != std::string::npos) {
+            name = name.substr(colon + 1);
+        }
+        
+        // 2. Remove Developer Suffix in parens (if at end)
+        // e.g. "Plugin Name (Developer)" -> "Plugin Name"
+        size_t lastParenOpen = name.rfind('(');
+        size_t lastParenClose = name.rfind(')');
+        
+        if (lastParenOpen != std::string::npos && lastParenClose != std::string::npos && lastParenClose > lastParenOpen) {
+            // Check if it's at the end (ignoring spaces)
+            bool isAtEnd = true;
+            for (size_t i = lastParenClose + 1; i < name.length(); i++) {
+                if (name[i] != ' ') { isAtEnd = false; break; }
+            }
+            if (isAtEnd) {
+                name = name.substr(0, lastParenOpen);
+            }
+        }
+        
+        // 3. Trim spaces
+        size_t first = name.find_first_not_of(' ');
+        if (std::string::npos == first) return "";
+        size_t last = name.find_last_not_of(' ');
+        return name.substr(first, (last - first + 1));
+    }
+
+    static std::string ToUpper(std::string s) {
+        std::transform(s.begin(), s.end(), s.begin(), ::toupper);
+        return s;
+    }
+
+    static FXMapping* LoadMappingFromFile(const std::string& fx_name) {
+        char* appData = getenv("APPDATA");
+        if (!appData) return nullptr;
+        
+        std::string sName = SanitizeName(fx_name);
+        char path[1024]; sprintf(path, "%s\\REAPER\\UserPlugins\\SoundFirst_Maps\\%s.ini", appData, sName.c_str());
+        
+        std::ifstream f(path);
+        if (!f.is_open()) return nullptr;
+        
+        FXMapping* map = new FXMapping(); 
+        map->plugin_name_signature = fx_name; 
+        
+        std::string line, section;
+        while (std::getline(f, line)) {
+            // Trim
+            size_t first = line.find_first_not_of(" \t\r\n");
+            if (std::string::npos == first) continue;
+            size_t last = line.find_last_not_of(" \t\r\n");
+            line = line.substr(first, (last - first + 1));
+            
+            if (line.empty() || line[0] == ';') continue;
+            
+            if (line[0] == '[') {
+                section = line.substr(1, line.find(']') - 1);
+                // Create page if new PageX section
+                if (section.find("Page") == 0) {
+                     try {
+                         int idx = std::stoi(section.substr(4));
+                         if (idx > 0) {
+                             while (map->pages.size() < (size_t)idx) map->pages.push_back(FXPage());
+                         }
+                     } catch(...) {}
+                }
+                continue;
+            }
+            
+            size_t eq = line.find('=');
+            if (eq == std::string::npos) continue;
+            std::string k_raw = line.substr(0, eq);
+            std::string v = line.substr(eq+1);
+            
+            std::string k = ToUpper(k_raw); // Case-insensitive key
+            
+            if (section.find("Page") == 0) {
+                int p_idx = std::stoi(section.substr(4)) - 1;
+                if (p_idx < 0 || p_idx >= map->pages.size()) continue;
+                
+                FXPage& page = map->pages[p_idx];
+                
+                if (k == "NAME") page.name = v;
+                else if (k[0] == 'K') {
+                    // K1, K1_SHIFT, K1_TOUCH
+                    int k_idx = -1;
+                    try {
+                        size_t underscore = k.find("_");
+                        if (underscore != std::string::npos) {
+                            k_idx = std::stoi(k.substr(1, underscore - 1)) - 1;
+                        } else {
+                            k_idx = std::stoi(k.substr(1)) - 1;
+                        }
+                    } catch(...) {}
+                    
+                    if (k_idx >= 0 && k_idx < 8) {
+                        int param_id = std::stoi(v);
+                        if (k.find("_SHIFT") != std::string::npos) page.knobs[k_idx].shift_param_id = param_id;
+                        else if (k.find("_TOUCH") != std::string::npos) page.knobs[k_idx].touch_param_id = param_id;
+                        else page.knobs[k_idx].param_id = param_id;
+                    }
+                }
+            }
+            else if (section == "Buttons") {
+                int btn_id = -1;
+                if (k == "LOOP") btn_id = BTN_LOOP;
+                else if (k == "METRO") btn_id = BTN_METRO;
+                else if (k == "TEMPO") btn_id = BTN_TEMPO;
+                else if (k == "IDEAS") btn_id = BTN_IDEAS;
+                else if (k == "QUANTIZE") btn_id = BTN_QUANTIZE;
+                else if (k == "AUTO") btn_id = BTN_AUTO;
+                else if (k == "MUTE") btn_id = BTN_MUTE;
+                else if (k == "SOLO") btn_id = BTN_SOLO;
+                
+                if (btn_id != -1) {
+                    map->buttons[btn_id] = v;
+                }
+            }
+            else if (section == "Main") {
+                if (k == "PLUGINNAME") {
+                    map->plugin_name_signature = v;
+                }
+            }
+        }
+        return map;
+    }
+
     static void InitializeMappings(std::vector<FXMapping>& m) {
         
         // =========================================================

@@ -1,52 +1,153 @@
 # SoundFirst PRO
+### Contextual Musical Interaction System for Komplete Kontrol + REAPER
+
 ![SoundFirst PRO Logo](logo.png)
 
-**The "Sound-First" Evolution.**
-
-
-### Born from Necessity
-This project was born from a real need. Its creator, a blind producer with limited economic resources to access expensive accessibility hardware, decided not to surrender to barriers. Instead, he created his own workflow to level the playing field.
-
-Today, this tool is shared freely with the world, in the hope that it empowers others facing similar challenges, or simply helps any producer seeking a deeper, distraction-free connection with their music.
-
-> *"When you remove visual distraction, all that remains is the truth of the audio."*
+**“When you remove the visual distraction, all that remains is the truth of the sound.”**
 
 ---
 
-### Current Hardware Compatibility
-*   **Native Instruments Komplete Kontrol A-Series**
-*   **Native Instruments Komplete Kontrol M-Series**
+## 🚀 What Is It?
 
-*With the help of the community, we are building a framework to easily add support for other controllers in the future.*
+SoundFirst PRO is a **`.dll` driver** that transforms your Komplete Kontrol A-Series or M-Series into a deep, contextual control system inside REAPER.
 
----
+It is not a traditional MIDI map nor a generic script.  
+It is a system that understands:
 
-### Why Your Studio Needs This
+- Which track is selected  
+- Which plugin is active  
+- Which work mode you are using  
 
-*   **Real Analog Feel (10-Bit):** Forget standard MIDI stepping (0-127). We have unlocked the encoders' native resolution (0-1023) so you feel every nuance of your filters and compression.
-*   **Auto-Solo Technology:** The system "knows" what you are touching. Rest your finger on an EQ knob, and we isolate that frequency instantly. Lift your finger, and you are back in the mix. No clicks, no menus.
-*   **Native HID Speed:** Direct communication with the Reaper core via C++. Zero latency. Total reliability.
-*   **Smart Banking:** The controller tracks your selection in Reaper and automatically assigns faders. You will never get lost in banks of 8 tracks again.
-*   **Easy Mapping:** Map any plugin in seconds using our intuitive **SoundFirst PRO Mapper**. No coding required.
+And it automatically adapts **knobs and buttons** to the context of your task, optimizing the **audio** flow.
 
 ---
 
-### Support the Project
-This software is open source and free. I do not ask for anything, just that you try it.
+## 🎯 Core Concept
 
-However, if you appreciate this work and it improves your workflow, please consider buying me a coffee. Your support helps me continue developing this tool for everyone.
+The hardware has no fixed function.  
+It adapts to your intent with **4 smart modes**:
 
-👉 **[Contact me on Telegram](https://t.me/JoseyXioly)**
-👉 **[Support Development / Buy a Coffee](https://buymeacoffee.com/soundfirstpro)**
+| Mode | Function |
+|------|---------|
+| Mixer | Volume, pan, solo/mute, transport, navigation |
+| Plugin | Plugin control with dynamic pages |
+| Audio | Clip editing (Trim, Nudge, Fade, Gain, Zoom) |
+| MIDI | Note editing (Pitch, length, velocity, grid, transposition) |
 
----
-
-### Full Documentation
-For a complete reference of every button, mode, and hidden function:
-
-👉 **[READ THE USER MANUAL (MANUAL.md)](documents/MANUAL.md)**
-👉 **[EASY MAPPING GUIDE (MAPPING_GUIDE.md)](documents/MAPPING_GUIDE.md)**
+Knobs and buttons change their behavior according to the context.
 
 ---
 
-[Leer en Español](documents/README_ES.md) | © 2026 José Pérez. Licensed under GNU GPL v3.
+## 🧠 Philosophy: Mixing with Muscle Memory
+
+SoundFirst PRO introduces **a physical standard across plugins**:
+
+- **K1 → Main Driver** (Threshold, Input, Peak Reduction, Boost)  
+- **K2 → Output Level** (Makeup, Output, Ceiling)  
+- Shift + Knob → Secondary parameters  
+- Touch Knob → Auto-Solo of the parameter/band  
+
+Your hand learns the mix.  
+Not your eyes.
+
+---
+
+## ⚡ Smart Auto-Solo
+
+- Touch a parameter → it is soloed.  
+- Release → the full mix returns.  
+- No menus, no clicks, no breaking the audio flow.
+
+---
+
+## 🔊 Auditory Feedback
+
+Includes actions that:
+
+- Announce peak level  
+- Report gain reduction on mapped compressors  
+
+Professional audio metering **without relying on sight**.
+
+---
+
+## 🔧 Extended Resolution (10-Bits)
+
+We leverage the full hardware resolution (0–1023 steps) for:
+
+- Greater precision  
+- Smoother control  
+- A more natural experience
+
+---
+
+## 🛠 Installation
+
+Installation is straightforward:
+
+1. Download the latest version from **Releases**.  
+2. Copy the `.dll` file into the folder: `UserPlugins` of REAPER.
+3. Restart REAPER.  
+4. Enjoy.
+
+No need to select models, configure profiles, or do manual mapping.  
+The system initializes automatically.
+
+### ⚠️ If the keyboard does not respond
+
+Make sure the **Komplete Kontrol DAW port is free** in REAPER's MIDI preferences.
+
+---
+
+## 🧩 Extensibility: SoundFirst PRO Mapper
+
+Includes a graphical tool to:
+
+- Create mappings for any VST/AU/CLAP plugin  
+- Auto-dump parameters from REAPER  
+- Multiple pages and smart actions  
+- Auto-recognition by plugin name  
+
+Any user can create, share, and improve mappings.
+
+---
+
+## 💻 Supported Hardware
+
+- Komplete Kontrol A49  
+- Komplete Kontrol A61  
+- Komplete Kontrol M32  
+
+Framework designed to expand to more devices in the future.
+
+---
+
+## 📖 The Story
+
+Born in a corner of my living room, without funding.  
+Just a Komplete Kontrol A61 and a conviction:  
+**producing music should feel like playing an instrument**.
+
+Existing integrations offered neither contextual control nor an audio-centric flow.  
+So I reinterpreted the hardware and built SoundFirst PRO.
+
+Every function exists because it solves a real flow problem.  
+It remains independent and humble, but its design standard is professional.
+
+---
+
+## 📜 License
+
+GNU GPL v3 – Open source and independent project.
+
+---
+
+## 🤝 Community
+
+Join the chat and share your mappings: [Telegram](https://t.me/SoundFirstPRO)  
+Support development: [Buy Me a Coffee](https://buymeacoffee.com/soundfirstpro)  
+
+---
+
+© 2026 José Pérez  
+[Leer en Español](README_ES.md)

@@ -277,10 +277,11 @@ std::string GetA61HidPath() {
                 char lMsg[512]; sprintf(lMsg, "[HID_SCAN] Found NI Device: %s", path.c_str());
                 RawLog(lMsg);
                 
-                // Prioritize user's actual hardware: PID 1750 (A-Series) OR PID 1860 (M32) OR 1620 (Legacy?)
+                // Prioritize user's actual hardware: PID 1750 (A-Series) OR PID 1860 (M32) OR 1620 (Legacy?) OR 1740 (A49)
                 // Both use the same protocol (MI 02 for DAW control usually)
                 if (matchPath.find("pid_1750") != std::string::npos || 
                     matchPath.find("pid_1860") != std::string::npos || 
+                    matchPath.find("pid_1740") != std::string::npos || 
                     matchPath.find("pid_1620") != std::string::npos) {
                     // Check for Interface 2 (DAW) or Interface 1/3 depending on model. 
                     // We look for "mi_02" or just accept the first valid PID match if strict MI check fails.
@@ -357,41 +358,77 @@ void CSurf_SoundFirst::ProcessHidQueue() {
     }
 }
 
-void CSurf_SoundFirst::RunNhlAction(const char* key) {
+bool CSurf_SoundFirst::RunNhlAction(const char* key) {
     LogDebug((std::string("Action Hit: ") + key).c_str());
     
     // Announce button press if enabled
     if (m_announce_buttons) SpeakText(key);
 
-    // TEMPORAL: Quitamos throttling para mapeo absoluto
-    // WDL_UINT64 now = GetTickCount64();
-    // if (now - m_last_button_time < 150) return;
-    // m_last_button_time = now;
-
     // 1. PRIORIDAD: Mapeos específicos de plugin si estamos en modo FX
     if (m_current_mode == MODE_FX) {
         MediaTrack* track = GetSelectedTrack(NULL, 0);
-        if (track) {
+        if (track && m_selected_fx_index >= 0) {
             char fxName[256]; TrackFX_GetFXName(track, m_selected_fx_index, fxName, 256);
-            int controlID = -1;
-            if (key == "IDEAS") controlID = 3000;
-            else if (key == "QUANTIZE") controlID = 3001;
-            else if (key == "UNDO") controlID = 3002;
-            else if (key == "METRO") controlID = 3003;
-            else if (key == "LOOP") controlID = 3004;
-            else if (key == "MUTE") controlID = 3005;
-            else if (key == "SOLO") controlID = 3006;
-            else if (key == "PRESET_UP") controlID = 3007;
-            else if (key == "PRESET_DOWN") controlID = 3008;
-            else if (key == "PLAY") controlID = 3009;
-            else if (key == "STOP") controlID = 3010;
-            else if (key == "REC") controlID = 3011;
             
-            if (controlID != -1 && g_plugin_mappings.count(fxName) && g_plugin_mappings[fxName].count(controlID)) {
-                int p_idx = g_plugin_mappings[fxName][controlID];
-                double v = TrackFX_GetParam(track, m_selected_fx_index, p_idx, NULL, NULL);
-                TrackFX_SetParam(track, m_selected_fx_index, p_idx, (v > 0.5) ? 0.0 : 1.0);
-                return;
+            // Checking dynamic mapping registry (User File or Factory)
+            FXMapping* map = FXMappingRegistry::GetMapping(fxName);
+            if (map) {
+                 int btn_id = -1;
+                 if (std::string(key) == "LOOP") btn_id = BTN_LOOP;
+                 else if (std::string(key) == "METRO") btn_id = BTN_METRO;
+                 else if (std::string(key) == "TEMPO") btn_id = BTN_TEMPO;
+                 else if (std::string(key) == "IDEAS") btn_id = BTN_IDEAS;
+                 else if (std::string(key) == "QUANTIZE") btn_id = BTN_QUANTIZE;
+                 else if (std::string(key) == "AUTO") btn_id = BTN_AUTO;
+                 else if (std::string(key) == "MUTE") btn_id = BTN_MUTE;
+                 else if (std::string(key) == "SOLO") btn_id = BTN_SOLO;
+                 // UNDO Removed by user request (Always Hardcoded Undo)
+
+                 if (btn_id != -1 && map->buttons.count(btn_id)) {
+                     std::string actionStr = map->buttons[btn_id];
+                     
+                     // 1. Is it a special action?
+                     if (actionStr.find('@') == 0) {
+                         // Recursively call self? No, that would loop for buttons.
+                         // But for special actions like @REPORT_PEAK or @REPORT_GR, we can call recursively
+                         // because the recursive call will hit the "Read from INI/Global" block? 
+                         // Wait, RunNhlAction handles @ strings at end.
+                         // Let's jump to the end logic by setting 'val' but we are inside a specific block.
+                         // Better: Execute logic here or refactor.
+                         
+                         // Re-use logic:
+                         if (actionStr.find("@REPORT_GR") == 0) {
+                             // Dynamic GR Report
+                             // If actionStr is just "@REPORT_GR", use current FX
+                             std::string cmd = actionStr;
+                             if (cmd == "@REPORT_GR") cmd = ":"+std::to_string(m_selected_fx_index);
+                             HandleReportGR(cmd);
+                             return true;
+                         }
+                         else if (actionStr == "@REPORT_PEAK") {
+                             ReportTrackPeak();
+                             return true;
+                         }
+                         // Extend for other actions as needed
+                     }
+                     
+                     // 2. Is it a Parameter ID?
+                     try {
+                         int p_idx = std::stoi(actionStr);
+                         if (p_idx >= 0) {
+                             double v = TrackFX_GetParam(track, m_selected_fx_index, p_idx, NULL, NULL);
+                             TrackFX_SetParam(track, m_selected_fx_index, p_idx, (v > 0.5) ? 0.0 : 1.0);
+                             
+                             // Announce change
+                             if (m_announce_buttons) {
+                                char buf[256];
+                                TrackFX_GetFormattedParamValue(track, m_selected_fx_index, p_idx, buf, 256);
+                                SpeakText(buf);
+                             }
+                             return true; // Override successful
+                         }
+                     } catch (...) {}
+                 }
             }
         }
     }
@@ -409,8 +446,8 @@ void CSurf_SoundFirst::RunNhlAction(const char* key) {
         else if (m_nhl_actions.count(key)) val = m_nhl_actions[key];
     }
 
-    // If no config found, do nothing (user must configure via mapper)
-    if (val.empty()) return;
+    // If no config found, return false (not handled)
+    if (val.empty()) return false;
 
     // Announce action if enabled
     if (m_announce_actions) {
@@ -470,7 +507,7 @@ void CSurf_SoundFirst::RunNhlAction(const char* key) {
         else if (val == "@DUMP_FX") DumpCurrentFX();
         else if (val == "@REPORT_STOP") { /* Stop reporting - handled by touch OFF */ }
         
-        return;
+        return true;
     }
 
     int cmdId = 0;
@@ -484,7 +521,9 @@ void CSurf_SoundFirst::RunNhlAction(const char* key) {
         if (cmdId == 40285 || cmdId == 40286) {
             UpdateBankFromSelectedTrack();
         }
+        return true;
     }
+    return false;
 }
 
 // FX Parameter Manipulation Functions
@@ -695,7 +734,8 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
     
     // IDEAS (0x20) -> GR Toggle (Shift) / GR Report / Auto-Solo
     if ((data[1] & 0x20) && !(old[1] & 0x20)) {
-         if (isShift) {
+         if (RunNhlAction("IDEAS")) { /* Overridden */ }
+         else if (isShift) {
              // Shift: Toggle Meter Mode (Peak <-> GR)
              m_gr_meter_mode = !m_gr_meter_mode;
              if (m_gr_meter_mode) SpeakText("Meter: G R");
@@ -720,7 +760,8 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
     
     // QUANTIZE -> Quantize Events (Mixer) / Quantize Events (MIDI) / Reverse (Audio)
     if ((data[1] & 0x10) && !(old[1] & 0x10)) {
-        if (m_current_mode == MODE_MIDI) {
+        if (RunNhlAction("QUANTIZE")) { /* Overridden */ }
+        else if (m_current_mode == MODE_MIDI) {
              if (isShift) { /* Unmapped */ }
              else {
                  // FIX: Send to Editor if available
@@ -756,7 +797,8 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
     
     // LOOP -> Loop Toggle (Mixer) / CUT (MIDI/AUDIO)
     if ((data[1] & 0x40) && !(old[1] & 0x40)) { 
-        if (m_current_mode == MODE_MIDI) {
+        if (RunNhlAction("LOOP")) { /* Overridden */ }
+        else if (m_current_mode == MODE_MIDI) {
              // User Request: Force 40012 (Cut)
              if (midi_editor) MIDIEditor_OnCommand(midi_editor, 40012);
              else Main_OnCommand(40012, 0); 
@@ -777,7 +819,8 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
     
     // METRO -> Metro Toggle (Mixer) / COPY (MIDI/AUDIO)
     if ((data[1] & 0x80) && !(old[1] & 0x80)) {
-        if (m_current_mode == MODE_MIDI) {
+        if (RunNhlAction("METRO")) { /* Overridden */ }
+        else if (m_current_mode == MODE_MIDI) {
              // User Request: Force 40010 (Copy)
              if (midi_editor) MIDIEditor_OnCommand(midi_editor, 40010);
              else Main_OnCommand(40010, 0);
@@ -793,7 +836,8 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
     // Byte 2: TRANSPORT
     // TEMPO -> Tap Tempo (Mixer) / PASTE (MIDI/AUDIO)
     if ((data[2] & 0x01) && !(old[2] & 0x01)) {
-        if (m_current_mode == MODE_MIDI) {
+        if (RunNhlAction("TEMPO")) { /* Overridden */ }
+        else if (m_current_mode == MODE_MIDI) {
              // User Request: Force 40011 (Paste)
              if (midi_editor) MIDIEditor_OnCommand(midi_editor, 40011);
              else Main_OnCommand(40011, 0);
@@ -816,7 +860,9 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
     
     // REC: Record (Normal) / Cycle Automation (Shift)
     if ((data[2] & 0x04) && !(old[2] & 0x04)) {
-        if (isShift) Main_OnCommand(40406, 0); // Cycle Automation Mode
+        if (isShift) {
+             if (!RunNhlAction("AUTO")) Main_OnCommand(40406, 0); // Cycle Automation Mode
+        }
         else Main_OnCommand(1013, 0);          // Transport: Record
     }
 
@@ -856,6 +902,34 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
         }
     }
 
+    // MUTE (0x40)
+    if ((data[2] & 0x40) && !(old[2] & 0x40)) {
+        if (RunNhlAction("MUTE")) { /* Overridden */ }
+        else {
+             if (m_current_mode == MODE_FX) {
+                 // FX Mode: Toggle Plugin Bypass
+                 MediaTrack* t = GetSelectedTrack(NULL, 0);
+                 if (t && m_selected_fx_index >= 0) {
+                     bool en = TrackFX_GetEnabled(t, m_selected_fx_index);
+                     TrackFX_SetEnabled(t, m_selected_fx_index, !en);
+                     SpeakText(en ? "Bypass On" : "Bypass Off"); 
+                 }
+             } else {
+                 // Default Mute Toggle (Track)
+                 Main_OnCommand(6, 0); // Track: Toggle Mute for selected tracks
+             }
+        }
+    }
+
+    // SOLO (0x80)
+    if ((data[2] & 0x80) && !(old[2] & 0x80)) {
+        if (RunNhlAction("SOLO")) { /* Overridden */ }
+        else {
+             // Default Solo Toggle (Track)
+             Main_OnCommand(7, 0); // Track: Toggle Solo for selected tracks
+        }
+    }
+
     // PRESET DOWN (0x20) -> FX Page Down / Bypass / Delete
     if ((data[2] & 0x20) && !(old[2] & 0x20)) {
         if (m_current_mode == MODE_FX) {
@@ -876,7 +950,7 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
         }
         else if (m_current_mode == MODE_MIDI) {
              HWND midi_editor = MIDIEditor_GetActive();
-             if (midi_editor) { Main_OnCommand(40667, 0); SpeakText("Delete Events"); }
+             if (midi_editor) { MIDIEditor_OnCommand(midi_editor, 40667); }
              else { Main_OnCommand(NamedCommandLookup("_OSARA_REMOVE"), 0); SpeakText("Delete Item"); }
         } else if (m_current_mode == MODE_AUDIO) {
             Main_OnCommand(NamedCommandLookup("_OSARA_REMOVE"), 0); // Remove items/tracks
@@ -885,24 +959,6 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
             Main_OnCommand(40298, 0); // Bypass FX Chain
         }
     }
-    
-    // Byte 2: MUTE (0x40) / SOLO (0x80)
-    if ((data[2] & 0x40) && !(old[2] & 0x40)) { // MUTE
-         if (m_current_mode == MODE_FX) {
-             // FX Mode: Toggle Plugin Bypass
-             MediaTrack* t = GetSelectedTrack(NULL, 0);
-             if (t && m_selected_fx_index >= 0) {
-                 bool en = TrackFX_GetEnabled(t, m_selected_fx_index);
-                 TrackFX_SetEnabled(t, m_selected_fx_index, !en);
-                 SpeakText(en ? "Bypass On" : "Bypass Off"); // Checks OLD state, so !en is new state. 
-                 // Wait, en=true (Active) -> Set(!en) -> Disabled (Bypass ON).
-                 // So if en was true, we just bypassed it. Correct.
-             }
-         } else {
-             Main_OnCommand(40280, 0); // Track Mute
-         }
-    }
-    if ((data[2] & 0x80) && !(old[2] & 0x80)) Main_OnCommand(40281, 0); // SOLO
 
     // Duplicate PRESET block removed.
 
@@ -1776,14 +1832,17 @@ void CSurf_SoundFirst::UpdateDisplay() {
     MediaTrack* tr = GetSelectedTrack(0, 0);
     if (tr) {
         track_available = 1;
-        char name[256];
-        if (GetSetMediaTrackInfo(tr, "P_NAME", NULL)) {
-            GetSetMediaTrackInfo(tr, "P_NAME", name);
-            if (strlen(name) == 0) sprintf(line1, "Track %d                        ", (int)GetMediaTrackInfo_Value(tr, "IP_TRACKNUMBER"));
-            else sprintf(line1, "%d. %-24s", (int)GetMediaTrackInfo_Value(tr, "IP_TRACKNUMBER"), name);
-        } else {
-             sprintf(line1, "Track %d                        ", (int)GetMediaTrackInfo_Value(tr, "IP_TRACKNUMBER"));
+        char name[256]; name[0] = 0;
+        // FIX: GetSetMediaTrackInfo with a pointer as 3rd arg SETS the value.
+        // We must pass NULL to GET the pointer.
+        char* pName = (char*)GetSetMediaTrackInfo(tr, "P_NAME", NULL);
+        if (pName) {
+            strncpy(name, pName, 255);
+            name[255] = 0;
         }
+
+        if (strlen(name) == 0) sprintf(line1, "Track %d                        ", (int)GetMediaTrackInfo_Value(tr, "IP_TRACKNUMBER"));
+        else sprintf(line1, "%d. %-.24s", (int)GetMediaTrackInfo_Value(tr, "IP_TRACKNUMBER"), name); // Limit to 24 chars safely
     } else {
         track_available = 0; // Host tells Controller: EMPTY
         sprintf(line1, "No Track Selected               ");

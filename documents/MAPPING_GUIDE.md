@@ -1,74 +1,68 @@
 # SoundFirst PRO - Easy Mapping Guide
 *Map any plugin in seconds, no coding required.*
 
+---
+
 ## The Concept
-SoundFirst PRO allows you to control any VST/AU/CLAP plugin with your Komplete Kontrol hardware.
-To do this, we create simple `.ini` files that tell the driver: *"Knob 1 controls Cutoff"*.
+SoundFirst PRO turns your Komplete Kontrol into a **universal controller for any VST/AU/CLAP plugin**.
+We use simple `.ini` files that tell the driver: *"Knob 1 controls Cutoff"*.
 
-We have built a special tool called **SoundFirst PRO Mapper** to make this instantaneous.
-
-### Where to Find the Tool
-*   **Executable (.exe):** Download the latest `SoundFirst_PRO_Mapper.exe` from the **[Releases Section](https://github.com/tu_usuario/tu_repo/releases)** of this repository.
-*   **Source Code:** The full Python source code is available in the `tools/` folder of this project.
-
-### Community & Support
-Need help mapping a plugin? Or want to share your maps?
-👉 **[Contact me on Telegram](https://t.me/JoseyXioly)**
-👉 **[Support Development / Buy a Coffee](https://buymeacoffee.com/soundfirstpro)**
+The **SoundFirst PRO Mapper** tool makes creating these maps instant and visual.
 
 ---
 
----
-
-## Step 1: Getting the Parameters
-First, we need to know what parameters your plugin has.
-
-1.  Open Reaper and add the plugin you want to map (e.g., *Serum* or *Pro-Q3*) to a track.
-2.  Make sure the plugin window is focused (click on it).
-3.  Open the Action List (`?`) and run **"Script: dump_fx_params.lua"**.
-    *   *Tip: Assign a shortcut like `Ctrl+Shift+D` to this script!*
-4.  A message will confirm: **"Parameters copied to clipboard!"**.
+## Where to Find the Tool
+* **Executable (.exe):** Download the mapper from the **[Releases Section](https://github.com/joseyxioly/SoundFirst-PRO/releases)**.
+* **Source Code:** The Python code is in the `tools/` folder of the project.
 
 ---
 
-## Step 2: The Mapper Tool
-Now, open the **SoundFirst PRO Mapper** tool included in the download folder (`run_fx_mapper.cmd`).
+## Community & Support
+Need help or want to share your maps?
+📢 [Join the discussion group on Telegram](https://t.me/SoundFirstPRO)
+☕ [Support development / Buy me a Coffee](https://buymeacoffee.com/soundfirstpro)
 
-1.  **Select Action:** Choose **"Create New Mapping"**.
-2.  **Paste:** Click "Next". The tool will automatically read the clipboard from Step 1.
-3.  **Wizard:** You are now in the graphical editor.
+---
+
+## Step 1: Get Plugin Parameters
+1. Open REAPER and add your plugin to a track (e.g. *Serum* or *Pro-Q3*).
+2. Click on the plugin window to focus it.
+3. Open the **Action List** (`?`) and run **“Script: dump_fx_params.lua”**.
+   *Tip: assign a shortcut, like `Ctrl+Shift+D`.*
+4. Copy the result to the clipboard (`Ctrl+C`).
+
+---
+
+## Step 2: Open SoundFirst PRO Mapper
+1. Run `SoundFirst_PRO_Mapper.exe`.
+2. Click on **“Create New Mapping”**.
+3. Paste the dump copied from Step 1 into the box and click **“Next”**.
+4. You are now in the graphical editor.
 
 ### How to Map
-The interface is designed for speed:
+The editor has 3 columns:
 
-*   **Left Column (Controls):** Select the Knob or Button on your hardware.
-    *   *Example: Select "Knob 1".*
-*   **Center Column (Parameters):** Search for the parameter you want.
-    *   *Example: Type "Cutoff".*
-*   **Assign:** Press **ENTER**.
-    *   Done! Knob 1 is now linked to Cutoff.
-    *   The selection automatically jumps to "Knob 2" so you can keep mapping without touching the mouse.
+1.  **Left Column (Controls):** Select the knob or button on your hardware.
+    *   *Optional:* Check **Shift** for the secondary layer or **Touch** for touch action (e.g. Auto-Solo).
+2.  **Center Column (Parameters):** Search for the parameter you want to control.
+    *   *Example: type “Cutoff” in the search box.*
+3.  **Assign:** Press **“Assign (Enter)”** or just hit **ENTER**.
+    *   *The selection automatically jumps to the next control for fast mapping.*
 
-### Advanced Features
-*   **Pages:** You can add multiple pages of controls (Page 1, Page 2...). Use the "Add Page" button.
-*   **Custom Labels:** You can rename parameters to appear nicely on the screen (e.g., "FiltFreq" instead of "Filter Frequency A").
-*   **Mode Specifics:**
-    *   **Strip (Touch):** If you map a parameter to "Touch", touching the knob will trigger the Auto-Solo for that band.
+### Advanced Functions
+- **Pages:** Use the right column to **Add Page** if you need more than 8 knobs.
+- **Right Click** on a page to rename or reorder it.
 
 ---
 
-## Step 3: Save and Play
-1.  Click **"Save Mapping"**.
-2.  The tool will suggest a filename (e.g., `Serum.ini`). **Do not change this name** unless necessary, as the driver needs it to recognize the plugin.
-3.  Save it in your `UserPlugins\FX_Mappings` folder.
-4.  **Restart Reaper** (or reload the driver).
+## Step 3: Save and Use
+1. Click on **“Save Mapping”**.
+2. The tool will suggest a filename (e.g. `Serum.ini`). **Do not change it** unless necessary.
+3. Save the file in the default folder (`.../UserPlugins/SoundFirst_Maps`).
 
-Next time you open that plugin, SoundFirst PRO will automatically switch to **Plugin Mode** and your knobs will work instantly.
+> The next time you open that plugin, SoundFirst PRO will automatically switch to **Plugin Mode** and your knobs will work instantly.
+> ⚠️ **Note:** You do not need to restart Reaper; the driver reads maps dynamically.
 
 ---
 
-## Where do I put the files?
-*   **Windows:** `%APPDATA%\REAPER\UserPlugins\FX_Mappings\`
-*   **Mac:** `~/Library/Application Support/REAPER/UserPlugins/FX_Mappings/`
-
-*Happy Mapping!*
+*Happy mapping and produce like a pro!*

@@ -1,128 +1,133 @@
-# SoundFirst PRO - User Manual
-*The intuitive guide to mastering your hardware.*
-
-## What is this?
-SoundFirst PRO is a **custom driver** that takes over your Komplete Kontrol keyboard and turns it into a deep production tool for Reaper.
-
-Unlike standard MIDI mappings, this driver "talks" to Reaper directly. It knows which track is selected, which plugin is open, and instantly changes the behavior of every knob and button to match your current task.
+# SoundFirst PRO - Essential Manual
+*Tactile production and contextual control in REAPER.*
 
 ---
 
-## The Concept: 4 Modes
-Think of your keyboard as having 4 distinct "personalities" or Modes. You switch between them depending on what you want to do.
+## Concept: 4 Control Modes
+Your keyboard changes function based on what you are doing, adapting to the context of the production:
 
-1.  **Mixer Mode (Default):** For balancing levels, panning, and basic transport.
-2.  **Plugin Mode (formerly FX Mode):** For tweaking plugins, synthesizers, and effects.
-3.  **Audio Mode:** For editing waveforms, splicing, and fading audio items.
-4.  **MIDI Mode:** For composing and editing notes in the MIDI editor.
-
-Let's explore them one by one.
+1. **Mixer Mode (TRACK):** Balance levels, pan, and transport.
+2. **Plugin Mode (PLUGIN):** Control plugins and synthesizers.
+3. **Audio Mode (BROWSER → AUDIO):** Edit audio clips.
+4. **MIDI Mode (BROWSER → MIDI):** Compose and edit notes in the Piano Roll.
 
 ---
 
-## 1. Mixer Mode (TRACK Button)
-This is the home base. Press the **TRACK** button to enter this mode.
-Use this mode when you are balancing your mix or recording.
+## 1. Mixer Mode
+*The command center for your mix.*
 
-### The Knobs
-*   **Touch a Knob:** The system instantly **Solos** that track (if "Auto-Solo" is enabled). Perfect for checking a specific instrument in the mix without clicking anything.
-*   **Turn Knobs 1-8:** Controls the **Volume** of the selected bank of 8 tracks.
-*   **Hold SHIFT + Turn:** Controls the **Pan** (Left/Right) of the tracks.
+### Knobs
+* **Turn K1-K8:** Controls **volume** of the selected 8-track bank.
+* **Touch:** Activates **Solo** only on the track corresponding to the knob.
+* **Shift + Turn:** Controls **pan**.
 
-### The Encoder (4D Joystick)
-*   **Rotate:** Moves the playhead cursor.
-*   **Up/Down:** Selects the Next/Previous track. *Note: As you move, the knobs automatically update to control the new bank of tracks.*
-*   **Left/Right:** Jumps to the Previous/Next Marker.
-*   **Click:** Inserts a new Marker at the current position.
+### 4D Encoder
+* **Rotate:** Moves the edit cursor by one beat.
+* **Up/Down:** Selects previous/next track (track bank updates automatically).
+* **Left/Right:** Jumps to previous/next marker.
+*   **Click:** Inserts a new marker.
 
-### Vital Buttons
-*   **PLAY / REC / STOP:** Work exactly as you expect.
-*   **LOOP:** Toggles the loop (repeat) mode.
-*   **METRO:** Turns the metronome click on/off.
-*   **TEMPO:** Tap it rhythmically to set the project BPM.
-*   **UNDO / REDO (Shift):** Fix mistakes instantly.
-*   **MUTE / SOLO:** Mute or Solo the *currently selected* track.
-*   **QUANTIZE:** Special function -> Solos the Reference Track (Track 1) for quick A/B comparison.
-
----
-
-## 2. Plugin Mode (PLUGIN Button)
-This is where the magic happens. Press the **PLUGIN** button to enter.
-Use this mode when you want to tweak an EQ, Compressor, or Synth.
-
-**What is Plugin Mode?**
-This mode allows you to control any VST/AU/CLAP plugin that has been mapped. Mappings can be created by the developer (included), the community, or by yourself using our easy tools.
-
-> **Important:** This mode focuses on the *currently selected track*.
-
-### The Knobs
-*   **Turn:** Controls a specific parameter of the open plugin (e.g., Cutoff, Threshold, Gain).
-*   **Touch:** If the plugin supports it (like Pro-Q3), touching the knob can isolate (solo) that specific band!
-
-### The Encoder (4D Joystick)
-*   **Left/Right:** Navigates between different selected plugins in the chain (e.g., move from EQ to Compressor).
-*   **Click:** Opens or Closes the floating window of the current plugin.
-
-### Page Navigation (PRESET Buttons)
-A plugin might have more than 8 parameters.
-*   **PRESET UP:** Go to the Next Page of 8 parameters.
-*   **PRESET DOWN:** Go to the Previous Page.
-
-*Tip: Use our **SoundFirst PRO Mapper** tool to custom-map exactly which parameter goes to which knob.*
-👉 **[Open the Easy Mapping Guide (MAPPING_GUIDE.md)](MAPPING_GUIDE.md)**
+### Buttons
+* **PLAY / REC / STOP:** Basic transport.
+* **LOOP:** Loop mode.
+* **METRO:** Toggle metronome.
+* **TEMPO:** Tap tempo: tap 4 times to set the desired speed or BPM.
+* **UNDO / REDO (Shift)**
+* **MUTE:** Mutes the selected track.
+*   **SOLO:** Isolates the selected track.
+* **QUANTIZE:** Solos the reference track (Track 1) for A/B comparisons.
+* **IDEAS:** Enable/Disable Auto-Solo (Mixer mode only, disabled by default).
 
 ---
 
-## 3. Audio Mode (Browser -> Audio)
-Press **BROWSER** and select "AUDIO" (or toggle) to enter.
-Use this mode when editing audio clips in the timeline (Arrange view).
+## 2. Plugin Mode
 
-### The Knobs
-When in Audio Mode, the knobs become precision editing tools for the *selected audio item*:
-1.  **Knob 1:** Move Cursor (Fine precision).
-2.  **Knob 2:** Nudge Item (Move the clip slightly).
-3.  **Knob 3:** Trim Start (Cut the beginning).
-4.  **Knob 4:** Trim End (Cut the end).
-5.  **Knob 5:** Item Volume / Gain.
-6.  **Knob 6:** Fade In length.
-7.  **Knob 7:** Fade Out length.
-8.  **Knob 8:** Horizontal Zoom.
+### Knobs
+* **Turn:** Controls a plugin parameter (Cutoff, Threshold, Gain, etc.).
+* **Touch:** Isolates the EQ band or executes any mapped action.
 
-### Editing Buttons
-*   **LOOP:** Cuts (Splits) the item at the cursor.
-*   **QUANTIZE:** -
-*   **Shift + QUANTIZE:** Reverses the audio item.
+### Encoder
+* **Left/Right:** Navigates between plugins in the chain.
+* **Up/Down:** Changes selected track.
+* **Click:** Opens the plugin window.
+* **Shift + Click:** Closes the plugin window.
+
+### Page Navigation
+* **PRESET UP:** Next page of 8 parameters.
+* **PRESET DOWN:** Previous page.
+
+### Special Buttons
+* **IDEAS:** Spoken feedback of Gain Reduction (GR).
+
+> This mode focuses on the selected track.
 
 ---
 
-## 4. MIDI Mode (Browser -> MIDI)
-Press **BROWSER** and select "MIDI" to enter.
-Use this mode when the MIDI Editor (Piano Roll) is open.
+## 3. Audio Mode
 
-### The Knobs
-1.  **Knob 1:** Navigate between notes in a chord.
-2.  **Knob 2:** Pitch (Move note Up/Down).
-3.  **Knob 3:** Move Note (Left/Right in time).
-4.  **Knob 4:** Note Length (Shorten/Lengthen).
-5.  **Knob 5:** Transpose (Semitones). *Shift: Octaves.*
-6.  **Knob 6:** Velocity (Loudness).
-7.  **Knob 7:** Grid Size.
-8.  **Knob 8:** Zoom.
+### Knobs
+1. **Knob 1:** Moves the cursor along the timeline with pixel precision (more precise when zoomed in).
+2. **Knob 2:** Moves the selected item left/right (Nudge).
+3. **Knob 3:** Trim start.
+4. **Knob 4:** Trim end.
+5. **Knob 5:** Item Volume / Gain.
+6. **Knob 6:** Fade In.
+7. **Knob 7:** Fade Out.
+8. **Knob 8:** Horizontal Zoom.
+
+### Encoder
+* **Rotate:** Moves the cursor by one beat.
+* **Up/Down:** Changes selected track.
+* **Left/Right:** Navigates between items.
+
+### Buttons
+* **LOOP:** Cut item.
+* **METRO:** Copy item.
+* **TEMPO:** Paste item.
+* **PRESET UP:** Split item.
+*   **PRESET DOWN:** Delete item.
+
+---
+
+## 4. MIDI Mode
+
+> Knob behavior changes depending on whether the Piano Roll is open or closed.
+
+### Knobs
+1. **Knob 1:** Navigates between notes or chords in the item.
+2. **Knob 2:** Navigates between notes within the chord (Pitch Up/Down).
+3. **Knob 3:** Moves notes in time.
+4. **Knob 4:** Note length.
+5. **Knob 5:** Transpose (Shift: Octaves).
+6. **Knob 6:** Velocity (intensity).
+7. **Knob 7:** Grid size.
+8. **Knob 8:** Zoom.
+
+### Encoder
+* **Rotate:** Moves the cursor by one beat.
+* **Up/Down:** Changes selected track.
+* **Left/Right:** Navigates between items.
+* **Click:** Opens the item in Piano Roll.
+* **Shift + Click:** Closes the item in Piano Roll.
+
+### Buttons
+* **LOOP:** Cut item.
+* **METRO:** Copy item.
+* **TEMPO:** Paste item.
+* **PRESET UP:** Split item.
+* **PRESET DOWN:** Delete item.
 
 ---
 
 ## Global Tools
-These work in all modes.
+* **SCALE:** Save project (Ctrl+S).
+* **ARP:** Spoken feedback of peak level (Peak).
+* **IDEAS:** Gain Reduction in plugins / Toggle Auto-Solo in Mixer.
 
-*   **SCALE:** Saves the Project (Ctrl+S).
-*   **ARP:** Spoken Feedback -> Reads current Track Peak Level (dB).
-*   **IDEAS:** Spoken Feedback -> Reads Gain Reduction (GR) on supported compressor mappings.
+---
 
-### Getting Support
-Need help? Verify you have installed the required SWS Extensions and OSARA.
-Check the [Release Page](https://github.com/joseyxioly/SoundFirst-PRO/releases) for updates.
-
-👉 **[Contact me on Telegram](https://t.me/JoseyXioly)**
-👉 **[Support Development / Buy a Coffee](https://buymeacoffee.com/soundfirstpro)**
+## Support and Community
+📢 [Join the discussion group on Telegram](https://t.me/SoundFirstPRO)  
+☕ [Support development / Buy me a Coffee](https://buymeacoffee.com/soundfirstpro)
 
 *Power to the Creators.*

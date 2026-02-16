@@ -120,5 +120,5 @@ Using the **SoundFirst PRO Mapper** included in the `tools/` folder, you can:
 
 **Join the Community:** We are building a standard. Share your `.ini` maps with other users to expand this library!
 
-👉 **[Contact me on Telegram](https://t.me/JoseyXioly)**
-👉 **[Support Development / Buy a Coffee](https://buymeacoffee.com/soundfirstpro)**
+📢 **[Join the Discussion on Telegram](https://t.me/SoundFirstPRO)**
+☕ **[Support Development / Buy me a Coffee](https://buymeacoffee.com/soundfirstpro)**

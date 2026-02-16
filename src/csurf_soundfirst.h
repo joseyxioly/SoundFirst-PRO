@@ -168,7 +168,7 @@ private:
     
     void HandleButton_Transport(int byte1, int byte2);
     void HandleButton_Track(int byte2, int byte3);
-    void RunNhlAction(const char* key);
+    bool RunNhlAction(const char* key);
     void HandleReportGR(const std::string& cmd);
     void ReportTrackPeak();
     void CheckConfigHotReload();
