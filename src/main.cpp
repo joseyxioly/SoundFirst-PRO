@@ -6,6 +6,7 @@
 #define REAPERAPI_IMPLEMENT
 
 #include "csurf_soundfirst.h"
+#include "fx_mappings.h"
 
 // Global surface pointer (reaKontrol pattern)
 IReaperControlSurface* g_surface = nullptr;
@@ -56,6 +57,11 @@ REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
             delete g_surface;
             g_surface = nullptr;
         }
+
+        // Clean up plugin mappings static cache on DLL unload
+        // Avoids multiple CSurf_SoundFirst instances deleting it prematurely
+        FXMappingRegistry::Cleanup();
+
         return 0;
     }
 }

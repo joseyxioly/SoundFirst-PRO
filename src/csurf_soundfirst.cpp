@@ -143,7 +143,6 @@ CSurf_SoundFirst::CSurf_SoundFirst(int inDev, int outDev, int outDev2) {
     m_current_fx_plugin = "";
     
     LoadMappingConfig();
-    LoadMappingConfig();
     
     // FORCE MODE RESET (V1.0 Standard)
     // Ignore whatever the INI file said.
@@ -171,6 +170,7 @@ CSurf_SoundFirst::~CSurf_SoundFirst() {
     if (m_hid_handle != INVALID_HANDLE_VALUE) CloseHandle(m_hid_handle);
     // MIDI Input removido
     if (m_midi_out) delete m_midi_out;
+
     ::CoUninitialize();
 }
 
@@ -341,6 +341,12 @@ void CSurf_SoundFirst::HidThreadLoop() {
             // Ensure we don't overflow internal fixed buffer (64)
             if (read > 64) read = 64; 
             
+            // Limit queue size to prevent unbounded memory growth
+            // if main thread is blocked (e.g. user opening a modal dialog)
+            if (m_hid_queue.size() > 100) {
+                m_hid_queue.pop();
+            }
+
             HidEvent ev; 
             memset(ev.data, 0, 64);
             memcpy(ev.data, buf, read);
@@ -1235,27 +1241,57 @@ void CSurf_SoundFirst::HandleKnobRotation(int idx, int d) {
     if (d == 0) return;
     ResetIdleTimer();
 
-    // ADAPTIVE ACCELERATION (V1.0)
-    // Formula: d_final = d * (1 + (abs(d) / 4))
-    // Small turns (d=1,2,3) -> Stay 1, 2, 3 (Precision)
-    // Medium turns (d=4,5) -> Becomes 8, 11 (Boost)
-    // Fast turns (d=10) -> Becomes 35 (Turbo)
-    
     int ad = abs(d);
-    int accel_d = d;
+    int sign = (d > 0) ? 1 : -1;
+    double accel_d_float = (double)ad;
+
+    // Multi-tiered smooth acceleration curve
+    // "Muy lento" -> Very small delta, precise control.
+    // "Lento" -> Small delta, normal speed.
+    // "Medio" -> Medium delta, moderate acceleration.
+    // "Rápido" -> Fast delta, higher acceleration.
+    // "Súper rápido" -> Very fast delta, maximum acceleration.
     
-    // Split Acceleration Profiles
     if (m_current_mode == MODE_FX) {
-        // GENTLER curve for FX (Parameters 0.0-1.0 are sensitive)
-        if (ad > 4) {
-             accel_d = d * (1 + (ad / 8)); 
+        // FX Parameters need fine control and smooth acceleration
+        if (ad == 1) {
+            accel_d_float = 0.5; // Muy lento (Requires 2 ticks for 1 step)
+        } else if (ad == 2) {
+            accel_d_float = 1.0; // Lento
+        } else if (ad >= 3 && ad <= 5) {
+            accel_d_float = ad * 1.5; // Medio
+        } else if (ad >= 6 && ad <= 9) {
+            accel_d_float = ad * 3.0; // Rápido
+        } else if (ad >= 10) {
+            accel_d_float = ad * 6.0; // Súper rápido
         }
     } else {
-        // AGGRESSIVE curve for Mixer/MIDI (Faders need travel)
-        if (ad > 3) {
-             accel_d = d * (1 + (ad / 4));
+        // Mixer/MIDI Faders need slightly more aggressive travel but still smooth
+        if (ad == 1) {
+            accel_d_float = 0.5; // Muy lento
+        } else if (ad == 2) {
+            accel_d_float = 1.0; // Lento
+        } else if (ad >= 3 && ad <= 5) {
+            accel_d_float = ad * 2.0; // Medio
+        } else if (ad >= 6 && ad <= 9) {
+            accel_d_float = ad * 4.0; // Rápido
+        } else if (ad >= 10) {
+            accel_d_float = ad * 8.0; // Súper rápido
         }
     }
+
+    // Accumulator for sub-integer precision (especially useful for 0.5)
+    static double fractional_accumulators[8] = {0};
+
+    // Safety check to prevent buffer overflow, although idx should be 0-7
+    if (idx < 0 || idx >= 8) return;
+
+    fractional_accumulators[idx] += accel_d_float * sign;
+
+    int accel_d = (int)fractional_accumulators[idx];
+    fractional_accumulators[idx] -= accel_d; // Keep the remainder
+
+    if (accel_d == 0) return; // Wait for more accumulated movement
     
     if (m_current_mode == MODE_MIXER) HandleKnob_Mixer(idx, accel_d);
     else if (m_current_mode == MODE_MIDI) HandleKnob_MIDI(idx, accel_d);
