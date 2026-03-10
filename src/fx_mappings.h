@@ -31,9 +31,25 @@ enum MappableButton {
 
 // Global Registry
 class FXMappingRegistry {
-public:
-    static FXMapping* GetMapping(const char* fx_name) {
+private:
+    static std::map<std::string, FXMapping*>& GetCache() {
         static std::map<std::string, FXMapping*> cache;
+        return cache;
+    }
+
+public:
+    static void Cleanup() {
+        for (auto& pair : GetCache()) {
+            if (pair.second) {
+                delete pair.second;
+                pair.second = nullptr;
+            }
+        }
+        GetCache().clear();
+    }
+
+    static FXMapping* GetMapping(const char* fx_name) {
+        auto& cache = GetCache();
         std::string sName = fx_name;
         
         // 1. Check Cache
