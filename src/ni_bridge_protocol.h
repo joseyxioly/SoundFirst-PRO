@@ -125,6 +125,15 @@ inline bool nativeNavigation(unsigned char command) {
            command == 0x33 || command == 0x34 || command == 0x35 || command == 0x36;
 }
 inline bool useCustomHid(bool instrument) { return !instrument; }
+// 4D encoder counter step. A/M-series counters are 4 bits (0-15) and wrap
+// 15 <-> 0, so take the shortest way round; wider counters wrap at 8 bits.
+inline int encoderDelta(unsigned char current, unsigned char previous) {
+    const int range = (current <= 0x0F && previous <= 0x0F) ? 16 : 256;
+    int delta = int(current) - int(previous);
+    if (delta > range / 2) delta -= range;
+    else if (delta < -range / 2) delta += range;
+    return delta;
+}
 inline int volumeFeedback(double amplitude) {
     // SoundFirst's own monotonic display scale; verify feel/display on hardware.
     if (amplitude <= 0) return 0;

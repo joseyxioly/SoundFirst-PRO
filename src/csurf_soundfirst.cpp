@@ -297,9 +297,10 @@ std::string GetA61HidPath() {
                 char lMsg[512]; sprintf(lMsg, "[HID_SCAN] Found NI Device: %s", path.c_str());
                 RawLog(lMsg);
                 
-                // Prioritize user's actual hardware: PID 1750 (A-Series) OR PID 1860 (M32) OR 1620 (Legacy?) OR 1740 (A49)
+                // Prioritize user's actual hardware: PID 1730 (A25), 1740 (A49), 1750 (A61), 1860 (M32), 1620 (Legacy?)
                 // Both use the same protocol (MI 02 for DAW control usually)
-                if (matchPath.find("pid_1750") != std::string::npos || 
+                if (matchPath.find("pid_1730") != std::string::npos ||
+                    matchPath.find("pid_1750") != std::string::npos ||
                     matchPath.find("pid_1860") != std::string::npos || 
                     matchPath.find("pid_1740") != std::string::npos || 
                     matchPath.find("pid_1620") != std::string::npos) {
@@ -1311,9 +1312,7 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
     // Encoder Turn (Continuous Counter): byte 28 on A-series, 24 on M32
     const int enc = m_encoder_byte;
     if (data[enc] != old[enc]) {
-        int delta = (int)((signed char)data[enc] - (signed char)old[enc]);
-        if (delta > 128) delta -= 256;
-        else if (delta < -128) delta += 256;
+        int delta = soundfirst_ni::encoderDelta(data[enc], old[enc]);
         if (delta != 0) HandleEncoderRotation(delta);
     }
 

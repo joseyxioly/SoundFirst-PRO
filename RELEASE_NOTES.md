@@ -1,6 +1,7 @@
-# SoundFirst PRO V2.0.1: two bug fixes
+# SoundFirst PRO V2.0.1: bug fixes and A25 support
 
-This release fixes two bugs. Nothing else changed from V2.0.
+This release fixes three bugs and adds the Komplete Kontrol A25. Nothing
+else changed from V2.0.
 
 ## Bug 1: the first button press was ignored
 
@@ -32,6 +33,24 @@ The M32 keeps it in a different place, so SoundFirst never saw it move.
 
 **The fix.** SoundFirst now checks which keyboard is connected and reads the
 encoder from the right place. A-series keyboards work exactly as before.
+
+## Bug 3: the encoder sometimes jumped the wrong way
+
+About once every 16 clicks, one click of the encoder could move a long way
+in the wrong direction.
+
+**Why it happened.** The keyboard counts encoder clicks from 0 to 15 and
+then starts again at 0. SoundFirst didn't expect the count to restart that
+soon, so going from 15 to 0 looked like 15 clicks backwards.
+
+**The fix.** SoundFirst now understands the count restarting, so each click
+moves exactly one step. This affects every supported keyboard.
+
+## New: Komplete Kontrol A25
+
+The A25 wasn't in SoundFirst's list of keyboards, so it was never detected.
+It's now included. It works the same way as the A49 and A61, but nobody has
+tested it on an A25 yet. If you own one, please tell us how it goes.
 
 ## Upgrade
 

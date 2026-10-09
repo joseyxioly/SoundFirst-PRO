@@ -128,5 +128,10 @@ int main() {
     assert(!shiftTrack(4,0,0));
     assert(!shiftTrack(0,4,1));
     assert(!shiftTrack(4,4,1));
+    // 4-bit encoder counter: steps and 15 <-> 0 wrap (A25 source, M32 capture).
+    assert(encoderDelta(2,1)==1 && encoderDelta(1,2)==-1);
+    assert(encoderDelta(0,15)==1 && encoderDelta(15,0)==-1);
+    assert(encoderDelta(4,1)==3 && encoderDelta(1,4)==-3);
+    assert(encoderDelta(0,255)==1 && encoderDelta(255,0)==-1);
     std::cout << "NI protocol and action ownership tests passed\n";
 }

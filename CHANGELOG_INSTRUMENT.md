@@ -36,6 +36,30 @@ read from the right positions on the M32.
 M32 (PID 1860) reads the encoder from byte 24; A-series keyboards keep byte
 28. The log records which layout was chosen (`[HID_LAYOUT]`).
 
+## V2.0.1 bug fix: encoder jumped the wrong way (2026-10-09)
+
+**Symptom.** Roughly once every 16 encoder clicks, a single click was read
+as a large step in the opposite direction.
+
+**Cause.** The encoder counter is 4 bits: it counts 0 to 15 and then wraps
+back to 0. SoundFirst only handled wrapping for an 8-bit counter, so one
+click across the wrap (15 to 0) looked like 15 steps backwards. The 4-bit
+counter is documented for the A25 by the komplementary-kontrol project, which
+reads the same report; the M32 capture shows the same small counter.
+
+**Fix.** The encoder step now takes the shortest way round a 4-bit counter
+(and still handles an 8-bit counter). The calculation lives in
+`soundfirst_ni::encoderDelta` and is covered by the protocol tests.
+
+## V2.0.1 addition: Komplete Kontrol A25 detection (2026-10-09)
+
+**Problem.** The A25 (USB product ID 1730) was not in SoundFirst's device
+list, so SoundFirst never connected to its buttons, knobs or encoder.
+
+**Fix.** PID 1730 is now detected. The A25 sends the same 30-byte report as
+the A49/A61 (button bits, knob touch, encoder at byte 28), confirmed against
+the komplementary-kontrol A25 source. Not yet tested on an A25.
+
 ## Release preparation (r12, 2026-10-09)
 
 README and release notes explain native NKS control, the selected/armed-track

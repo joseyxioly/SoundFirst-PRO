@@ -135,6 +135,7 @@ Any user can create, share, and improve mappings.
 
 ## 💻 Supported Hardware
 
+- Komplete Kontrol A25 (added in V2.0.1, not yet tested on hardware)  
 - Komplete Kontrol A49  
 - Komplete Kontrol A61  
 - Komplete Kontrol M32  
