@@ -1,5 +1,24 @@
 # Changelog: Instrument mode and SoundFirst PRO naming
 
+## V2.0.2 change: Shift+Browser opens the mode menu (2026-10-09)
+
+**Problem.** Plain Browser opened SoundFirst's mode menu, but Browser is also
+Komplete Kontrol's own button. Each press opened NI's browser as well, and
+NI's browser then took the encoder. Turning the encoder to choose a
+SoundFirst mode also scrolled through Komplete Kontrol's browser. SoundFirst
+cannot stop NI from receiving a button, so this happened on every model.
+
+**Cause.** A shared button. Outside its browser, NI does not use the encoder
+itself; it only forwards turns to the DAW port (CC 0x34), which SoundFirst
+ignores. So the clash came from Browser, not from the encoder.
+
+**Change.** The mode menu now opens with Shift+Browser. Komplete Kontrol
+ignores that combination (checked on an M32 with NI's speech), so NI's
+browser stays closed and the encoder only moves SoundFirst's menu. Plain
+Browser is left to Komplete Kontrol. Instrument mode is unchanged: Plugin
+then Browser still hands control to NI, and Browser twice still leaves it.
+The Mixer voice guidance now says "press Shift and Browser".
+
 ## V2.0.1 bug fix: first button press ignored (2026-10-09)
 
 **Symptom.** After REAPER started, the first button press on the keyboard did

@@ -1,12 +1,12 @@
 # r10c: control Komplete Kontrol
 
-1. Press Browser.
+1. Press Shift+Browser (V2.0.2; plain Browser before).
 2. Turn the encoder to choose Instrument mode, then press the encoder.
 3. Press Plugin, followed by Browser.
 
 You can now use Komplete Kontrol's native NKS instrument controls.
 To leave Instrument mode, press Browser twice.
-Outside Instrument, choose MIDI/Audio/Instrument with Browser, turn the encoder,
+Outside Instrument, choose MIDI/Audio/Instrument with Shift+Browser, turn the encoder,
 then press the encoder. Double Browser is an exit from Instrument, not an
 outside-Instrument mode-cycle gesture. SoundFirst mode and native NI context
 are separate. Both physical presses remain visible to NI.

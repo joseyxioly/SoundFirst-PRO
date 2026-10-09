@@ -1101,8 +1101,10 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
         RawLog(diag);
     }
     
-    // BROWSER: Mode Selection
-    if ((data[3] & 0x01) && !(old[3] & 0x01)) {
+    // SHIFT+BROWSER: Mode Selection. Plain Browser belongs to Komplete
+    // Kontrol: it opens NI's browser, which then takes the encoder too.
+    // NI ignores Shift+Browser, so the encoder only moves SoundFirst's menu.
+    if (isShift && (data[3] & 0x01) && !(old[3] & 0x01)) {
         m_browser_mode_selection = true;
         SpeakText(("Mode " + m_available_modes[m_current_mode_idx]).c_str());
     }
@@ -2423,7 +2425,7 @@ void CSurf_SoundFirst::ExitInstrumentMode() {
     // This changes SoundFirst only. It does not revoke native NI ownership.
     ResetIdleTimer();
     UpdateDisplay(); // Restore complete Mixer state even when values match pre-entry.
-    SpeakText("Mixer mode. To control Komplete Kontrol, press Browser, choose Instrument with the encoder and press it. Then press Plugin, followed by Browser.");
+    SpeakText("Mixer mode. To control Komplete Kontrol, press Shift and Browser, choose Instrument with the encoder and press it. Then press Plugin, followed by Browser.");
 }
 
 

@@ -83,5 +83,5 @@ assert 'NI handshake not confirmed. Use reconnect.' not in s
 print('r10 pending vs final-timeout voice and compact connection summary verified')
 
 assert 'Press Plugin, then Browser to control Komplete Kontrol.' in s
-assert 'press Browser, choose Instrument with the encoder and press it. Then press Plugin, followed by Browser.' in s
+assert 'press Shift and Browser, choose Instrument with the encoder and press it. Then press Plugin, followed by Browser.' in s
 print('r10b action guidance voice, technical status logged, actual selector flow retained')
