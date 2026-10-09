@@ -112,7 +112,7 @@ public:
     virtual void Run();
     virtual void SetSurfaceSelected(MediaTrack* track, bool selected);
     virtual void SetTrackListChange();
-    void ToggleInstrumentMode();
+    void ToggleInstrumentMode(bool fromBrowser = false);
     void ExitInstrumentMode();
     void ReconnectNi();
     void ReportNiState();
@@ -166,6 +166,7 @@ private:
     void CloseNiSession();
     void PumpNiInput();
     void RefreshNiFocus(bool force = false);
+    std::string FindNiInstance(MediaTrack* track);
     void ReleaseTouchSolos();
     void AdoptHidBaseline(const unsigned char* data);
     void SendNiPacket(const soundfirst_ni::Packet& packet);

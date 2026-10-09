@@ -1108,6 +1108,18 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
         m_browser_mode_selection = true;
         SpeakText(("Mode " + m_available_modes[m_current_mode_idx]).c_str());
     }
+
+    // BROWSER alone: Komplete Kontrol opens its own browser. If the selected
+    // track has an NI instance, follow it into Instrument mode so SoundFirst
+    // stops acting on the controls and focuses that instance.
+    if (!isShift && (data[3] & 0x01) && !(old[3] & 0x01)) {
+        if (!FindNiInstance(GetSelectedTrack(nullptr, 0)).empty()) {
+            ToggleInstrumentMode(true);
+            AdoptHidBaseline(data);
+            return;
+        }
+        SpeakText("No Komplete Kontrol on this track");
+    }
     
     // PLUGIN: FX Mode Directly
     if ((data[3] & 0x02) && !(old[3] & 0x02)) {
@@ -2212,20 +2224,25 @@ void CSurf_SoundFirst::PumpNiInput() {
     }
 }
 
-void CSurf_SoundFirst::RefreshNiFocus(bool force) {
-    MediaTrack* track = GetSelectedTrack(nullptr, 0);
-    std::string id;
-    if (track) {
-        for (int fx = 0; fx < TrackFX_GetCount(track) && id.empty(); ++fx) {
-            const int count = TrackFX_GetNumParams(track, fx);
-            for (int parameter : {0, 128, 2048, 4096}) {
-                if (parameter >= count) continue;
-                char name[128] = {};
-                if (TrackFX_GetParamName(track, fx, parameter, name, sizeof(name)) &&
-                    soundfirst_ni::validInstance(name)) { id = name; break; }
-            }
+// First NI instance ID (Komplete Kontrol, Kontakt, ...) among the track's
+// top-level FX, or empty when there is none.
+std::string CSurf_SoundFirst::FindNiInstance(MediaTrack* track) {
+    if (!track) return "";
+    for (int fx = 0; fx < TrackFX_GetCount(track); ++fx) {
+        const int count = TrackFX_GetNumParams(track, fx);
+        for (int parameter : {0, 128, 2048, 4096}) {
+            if (parameter >= count) continue;
+            char name[128] = {};
+            if (TrackFX_GetParamName(track, fx, parameter, name, sizeof(name)) &&
+                soundfirst_ni::validInstance(name)) return name;
         }
     }
+    return "";
+}
+
+void CSurf_SoundFirst::RefreshNiFocus(bool force) {
+    MediaTrack* track = GetSelectedTrack(nullptr, 0);
+    std::string id = FindNiInstance(track);
     const bool instrument = m_current_mode == MODE_INSTRUMENT;
     const std::string requested = soundfirst_ni::selectedFocus(instrument,id);
     const std::string scan="[NI_FOCUS_SCAN] detected="+(id.empty()?std::string("NONE"):id)+
@@ -2340,7 +2357,7 @@ void CSurf_SoundFirst::ReleaseTouchSolos() {
     }
 }
 
-void CSurf_SoundFirst::ToggleInstrumentMode() {
+void CSurf_SoundFirst::ToggleInstrumentMode(bool fromBrowser) {
     if (m_current_mode == MODE_INSTRUMENT) {
         ExitInstrumentMode();
         return;
@@ -2353,7 +2370,8 @@ void CSurf_SoundFirst::ToggleInstrumentMode() {
         m_ni_feedback_dirty = true;
         RefreshNiFocus(true);
         MaybeRecoverNiHello();
-        SpeakText("Instrument mode. Press Plugin, then Browser to control Komplete Kontrol. Press Browser twice to leave Instrument mode.");
+        if (fromBrowser) SpeakText("Instrument mode. Press Browser twice to leave.");
+        else SpeakText("Instrument mode. Press Plugin, then Browser to control Komplete Kontrol. Press Browser twice to leave Instrument mode.");
         if (!m_ni_input || !m_midi_out)
             SpeakText(("NI DAW ports unavailable. " + m_ni_session_state + ". Use reconnect.").c_str());
         else if (m_ni_timeout_announced && m_ni_recovery.attempts()>=3)

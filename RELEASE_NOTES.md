@@ -1,31 +1,34 @@
-# SoundFirst PRO V2.0.2: Shift+Browser opens the mode menu
+# SoundFirst PRO V2.0.2: Browser takes you straight to your instrument
 
 ## What changed
 
-To choose a SoundFirst mode (MIDI, Audio or Instrument), press **Shift +
-Browser**, turn the encoder, then click the encoder. Plain Browser no longer
-opens SoundFirst's mode menu.
+- **Browser** on a track with Komplete Kontrol now switches SoundFirst to
+  Instrument mode by itself. Komplete Kontrol opens its browser and
+  SoundFirst steps aside in the same press. On a track without Komplete
+  Kontrol, SoundFirst says "No Komplete Kontrol on this track".
+- **Shift + Browser** opens SoundFirst's mode menu (MIDI, Audio or
+  Instrument). Turn the encoder, then click it.
+- **Browser twice** still leaves Instrument mode.
 
 ## Why
 
-Browser is also Komplete Kontrol's own button. Pressing it opened Komplete
-Kontrol's browser at the same time as SoundFirst's menu, so turning the
-encoder moved through both at once. Choosing a SoundFirst mode also scrolled
-through Komplete Kontrol's sounds.
+Browser is also Komplete Kontrol's own button. In V2.0.1 it opened
+SoundFirst's mode menu and Komplete Kontrol's browser at the same time, so
+turning the encoder moved through both at once. Choosing a SoundFirst mode
+also scrolled through Komplete Kontrol's sounds.
 
-Komplete Kontrol doesn't react to Shift + Browser, so now only SoundFirst's
-menu opens and the encoder only moves through SoundFirst's modes.
+Now Browser always belongs to Komplete Kontrol, and SoundFirst follows it
+into Instrument mode instead of competing for the encoder. Komplete Kontrol
+doesn't react to Shift + Browser, so SoundFirst's mode menu has the encoder
+to itself.
 
 ## Instrument mode
 
 1. Select and arm the track with Komplete Kontrol.
-2. Press **Shift + Browser**, turn the encoder to **Instrument**, and click
-   the encoder.
-3. Press **Plugin**, then **Browser**, to control Komplete Kontrol.
+2. Press **Browser**.
+3. If the keyboard doesn't control Komplete Kontrol yet, press **Plugin**,
+   then **Browser**.
 4. Press **Browser twice** to leave Instrument mode.
-
-Steps 3 and 4 are unchanged. There, Browser is meant to reach Komplete
-Kontrol.
 
 ## Upgrade
 

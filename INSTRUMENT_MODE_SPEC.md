@@ -1,3 +1,11 @@
+# V2.0.2: Browser follows Komplete Kontrol
+
+Plain Browser on a selected track with an NI instance enters Instrument mode
+(SoundFirst pauses its controls and focuses that instance; NI opens its
+browser from the same press). Without an NI instance, plain Browser only says
+"No Komplete Kontrol on this track". Shift+Browser opens SoundFirst's mode
+menu, which NI ignores. Exit is unchanged: Browser twice.
+
 # r10c: control Komplete Kontrol
 
 1. Press Shift+Browser (V2.0.2; plain Browser before).

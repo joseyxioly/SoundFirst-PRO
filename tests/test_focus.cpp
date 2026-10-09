@@ -29,6 +29,7 @@ public:
  bool m_ni_focus_sent=false,m_ni_focus_instrument=false;
  std::vector<soundfirst_ni::Packet> sent;
  void RefreshNiFocus(bool force=false);
+ std::string FindNiInstance(MediaTrack* track);
  void LogDebug(const char*){}
  void SendNiPacket(const soundfirst_ni::Packet& p){sent.push_back(p);}
 };

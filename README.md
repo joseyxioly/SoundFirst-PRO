@@ -45,8 +45,8 @@ Play your instruments with Komplete Kontrol's native NKS controls.
 Then return to your mix or edit the MIDI you just recorded.
 
 1. Select and arm the track containing Komplete Kontrol.
-2. Press **Shift + Browser**, turn the encoder to choose **Instrument**, then click the encoder.
-3. Press **Plugin**, followed by **Browser**, to control Komplete Kontrol.
+2. Press **Browser**. SoundFirst switches to Instrument mode by itself and Komplete Kontrol opens its browser.
+3. If the keyboard doesn't control Komplete Kontrol yet, press **Plugin**, followed by **Browser**.
 4. Play, browse presets or change the instrument using the native NKS controls.
 5. Press **Browser twice** to leave Instrument mode and return to SoundFirst.
 6. Disarm that track. Select and arm the next track, then repeat.
@@ -56,6 +56,9 @@ Keep that same track selected and only that track armed.
 
 Instrument mode lets Native Instruments handle the instrument controls.  
 SoundFirst pauses its custom controls until you leave the mode.
+
+To choose a SoundFirst mode (MIDI, Audio or Instrument) yourself, press **Shift + Browser**, turn the encoder and click it.  
+On a track without Komplete Kontrol, plain Browser leaves SoundFirst as it is and says so.
 
 ---
 

@@ -19,6 +19,15 @@ Browser is left to Komplete Kontrol. Instrument mode is unchanged: Plugin
 then Browser still hands control to NI, and Browser twice still leaves it.
 The Mixer voice guidance now says "press Shift and Browser".
 
+**Also: plain Browser enters Instrument mode.** Since plain Browser now
+belongs to Komplete Kontrol, pressing it on a selected track that has an NI
+instance switches SoundFirst into Instrument mode in the same press:
+SoundFirst pauses its controls and focuses that instance while NI opens its
+browser. Voice: "Instrument mode. Press Browser twice to leave." On a track
+without an NI instance SoundFirst says "No Komplete Kontrol on this track"
+and stays in its current mode. The instance scan moved into
+`FindNiInstance`, shared with focus updates; the focus test covers it.
+
 ## V2.0.1 bug fix: first button press ignored (2026-10-09)
 
 **Symptom.** After REAPER started, the first button press on the keyboard did

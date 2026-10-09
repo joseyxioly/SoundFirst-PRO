@@ -60,8 +60,8 @@ assert 'RefreshNiFocus(true)' in exit_block
 assert 'm_ni_sent_focus' in h and 'm_ni_focus_sent' in h
 assert 'NI_FOCUS_SCAN' in s and 'NI_FOCUS_SENT' in s
 print('r8 detected/transmitted focus separated; exit withdraws link')
-f=s.split('void CSurf_SoundFirst::RefreshNiFocus')[1].split('void CSurf_SoundFirst::ReportNiConnect')[0]
-assert (r/'tests/focus_source.inc').read_text()=='void CSurf_SoundFirst::RefreshNiFocus'+f
+f=s.split('std::string CSurf_SoundFirst::FindNiInstance')[1].split('void CSurf_SoundFirst::ReportNiConnect')[0]
+assert (r/'tests/focus_source.inc').read_text()=='std::string CSurf_SoundFirst::FindNiInstance'+f
 print('r8 mocked focus test runs exact production scan/transmission branch')
 
 assert 'MaybeRecoverNiHello();' in s

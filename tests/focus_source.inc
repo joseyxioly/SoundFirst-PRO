@@ -1,17 +1,20 @@
-void CSurf_SoundFirst::RefreshNiFocus(bool force) {
-    MediaTrack* track = GetSelectedTrack(nullptr, 0);
-    std::string id;
-    if (track) {
-        for (int fx = 0; fx < TrackFX_GetCount(track) && id.empty(); ++fx) {
-            const int count = TrackFX_GetNumParams(track, fx);
-            for (int parameter : {0, 128, 2048, 4096}) {
-                if (parameter >= count) continue;
-                char name[128] = {};
-                if (TrackFX_GetParamName(track, fx, parameter, name, sizeof(name)) &&
-                    soundfirst_ni::validInstance(name)) { id = name; break; }
-            }
+std::string CSurf_SoundFirst::FindNiInstance(MediaTrack* track) {
+    if (!track) return "";
+    for (int fx = 0; fx < TrackFX_GetCount(track); ++fx) {
+        const int count = TrackFX_GetNumParams(track, fx);
+        for (int parameter : {0, 128, 2048, 4096}) {
+            if (parameter >= count) continue;
+            char name[128] = {};
+            if (TrackFX_GetParamName(track, fx, parameter, name, sizeof(name)) &&
+                soundfirst_ni::validInstance(name)) return name;
         }
     }
+    return "";
+}
+
+void CSurf_SoundFirst::RefreshNiFocus(bool force) {
+    MediaTrack* track = GetSelectedTrack(nullptr, 0);
+    std::string id = FindNiInstance(track);
     const bool instrument = m_current_mode == MODE_INSTRUMENT;
     const std::string requested = soundfirst_ni::selectedFocus(instrument,id);
     const std::string scan="[NI_FOCUS_SCAN] detected="+(id.empty()?std::string("NONE"):id)+

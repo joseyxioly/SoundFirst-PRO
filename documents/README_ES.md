@@ -30,14 +30,16 @@ Después vuelve a tu mezcla o edita el MIDI que acabas de grabar.
 Instrument se suma como el quinto modo, junto a Mixer, Plugin, Audio y MIDI.
 
 1. Selecciona y arma la pista que contiene Komplete Kontrol.
-2. Pulsa **Shift + Browser**, gira el encoder para elegir **Instrument** y haz click en el encoder.
-3. Pulsa **Plugin** y después **Browser** para controlar Komplete Kontrol.
+2. Pulsa **Browser**. SoundFirst pasa solo a modo Instrument y Komplete Kontrol abre su navegador.
+3. Si el teclado aún no controla Komplete Kontrol, pulsa **Plugin** y después **Browser**.
 4. Toca, explora presets o cambia de instrumento con los controles NKS nativos.
 5. Pulsa **Browser dos veces** para salir de Instrument y volver a SoundFirst.
 6. Desarma esa pista. Selecciona y arma la siguiente, y repite.
 
 Con varias instancias de Komplete Kontrol, **la pista armada toma el control** en este flujo.  
 Mantén esa misma pista seleccionada y solo esa pista armada.
+
+Para elegir tú un modo de SoundFirst (MIDI, Audio o Instrument), pulsa **Shift + Browser**, gira el encoder y haz click.
 
 Instrument deja que Native Instruments controle el instrumento.  
 SoundFirst pausa sus controles personalizados hasta que salgas del modo.
