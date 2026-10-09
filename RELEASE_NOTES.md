@@ -1,3 +1,32 @@
+# SoundFirst PRO V2.0.1: first button press fix
+
+## The bug
+
+After starting REAPER, the first button you pressed on the keyboard was
+ignored. Most people noticed it on Browser: you had to press it twice before
+SoundFirst said "Mode MIDI". Everything after that first press worked. It
+came back whenever the keyboard was disconnected and reconnected.
+
+## Why it happened
+
+The keyboard only sends data when something changes. SoundFirst treated the
+very first data it received as the "nothing pressed" starting point and did
+not act on it. Since that first data was usually your first button press,
+the press was used as the starting point instead of being handled.
+
+## The fix
+
+SoundFirst still takes knob and encoder positions from that first data, so
+knobs don't jump. Buttons are now compared against "nothing pressed", so your
+first press works like every other one. Nothing else changed from V2.0.
+
+## Upgrade
+
+Close REAPER and replace `reaper_soundfirst_pro.dll` in `UserPlugins` with
+the one attached to this release.
+
+---
+
 # SoundFirst PRO: native NKS instruments in the workflow
 
 Instrument mode brings Komplete Kontrol's native NKS controls into SoundFirst

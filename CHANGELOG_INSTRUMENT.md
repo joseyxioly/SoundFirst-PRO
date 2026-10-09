@@ -1,5 +1,23 @@
 # Changelog: Instrument mode and SoundFirst PRO naming
 
+## V2.0.1 bug fix: first button press ignored (2026-10-09)
+
+**Symptom.** After REAPER started, the first button press on the keyboard did
+nothing. For example, Browser had to be pressed twice before SoundFirst said
+"Mode MIDI". Every press after that worked. It happened again after the
+keyboard disconnected and reconnected.
+
+**Cause.** The keyboard only sends a HID report when a button, knob or the
+encoder changes. SoundFirst used the first report it received as its
+"nothing pressed" reference and returned without processing it. That first
+report was normally the user's first button press, so the press became the
+reference instead of an action. Found with the HID capture action on an M32.
+
+**Fix.** The first report still sets the knob and encoder reference, so
+knobs do not jump. Buttons (bytes 1-5) are compared against "nothing held",
+so a press in the first report is handled like any other press. This applies
+in every mode, including Instrument. A regression test covers it.
+
 ## Release preparation (r12, 2026-10-09)
 
 README and release notes explain native NKS control, the selected/armed-track

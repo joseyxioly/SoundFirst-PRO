@@ -30,7 +30,14 @@ void CSurf_SoundFirst::HandleNiCommand(unsigned char command, unsigned char valu
 void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
     ResetIdleTimer(); // Activity detected
     unsigned char* old = m_last_hid_report;
-    if (!m_hid_baseline) { AdoptHidBaseline(data); return; }
+    if (!m_hid_baseline) {
+        // The keyboard only sends a report when something changes, so the
+        // first report after connecting is usually a button press. Take knob
+        // and encoder positions from it, but compare buttons (bytes 1-5)
+        // against "nothing held" so that first press is not swallowed.
+        AdoptHidBaseline(data);
+        memset(m_last_hid_report + 1, 0, 5);
+    }
     if (m_current_mode == MODE_INSTRUMENT) {
         if (m_shift_track_exit && soundfirst_ni::shiftTrack(data[3],old[3],data[1])) {
             LogDebug("[NI_EXIT_SHIFT_TRACK] Shift+TRACK observed; exit requested; NI can also switch instance");

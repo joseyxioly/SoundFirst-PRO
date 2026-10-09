@@ -94,4 +94,13 @@ int main() {
  report[3]=0;capture.m_hid_observed=7790.44;capture.HandleHidReport(report);
  report[3]=1;capture.m_hid_observed=7790.50;capture.HandleHidReport(report);
  assert(capture.exits==1);
+ // First report after connecting is a held button: it must count as a press,
+ // while knob/encoder bytes are adopted as the baseline.
+ CSurf_SoundFirst first;first.m_hid_baseline=false;
+ memset(report,0,64);report[3]=1;report[6]=0x40;report[28]=5;
+ first.m_hid_observed=400;first.HandleHidReport(report);
+ assert(first.m_hid_baseline && first.m_last_hid_report[3]==1);
+ report[3]=0;first.HandleHidReport(report);
+ report[3]=1;first.m_hid_observed=400.2;first.HandleHidReport(report);
+ assert(first.exits==1);
 }
