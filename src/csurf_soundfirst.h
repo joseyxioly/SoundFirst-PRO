@@ -13,6 +13,8 @@
 #include <atomic>
 #include <map>
 #include <string>
+#include <vector>
+#include "ni_bridge_protocol.h"
 
 // WDL types (Required by REAPER headers)
 #ifndef WDL_INT64
@@ -28,6 +30,26 @@ typedef unsigned long long WDL_UINT64;
 // Forward declarations
 class ReaProject;
 typedef class ReaProject* Reaproject;
+
+// NI bridge REAPER APIs
+#define REAPERAPI_WANT_plugin_register
+#define REAPERAPI_WANT_DB2SLIDER
+#define REAPERAPI_WANT_CSurf_GoStart
+#define REAPERAPI_WANT_GetNumMIDIInputs
+#define REAPERAPI_WANT_GetMIDIInputName
+#define REAPERAPI_WANT_GetNumMIDIOutputs
+#define REAPERAPI_WANT_GetMIDIOutputName
+#define REAPERAPI_WANT_CSurf_OnPlay
+#define REAPERAPI_WANT_CSurf_OnStop
+#define REAPERAPI_WANT_CSurf_OnRecord
+#define REAPERAPI_WANT_CSurf_OnVolumeChange
+#define REAPERAPI_WANT_CSurf_OnPanChange
+#define REAPERAPI_WANT_CSurf_OnMuteChange
+#define REAPERAPI_WANT_CSurf_OnSoloChange
+#define REAPERAPI_WANT_SetOnlyTrackSelected
+#define REAPERAPI_WANT_GetPlayState
+#define REAPERAPI_WANT_GetToggleCommandState
+#define REAPERAPI_WANT_ValidatePtr2
 
 // REAPER API requirements
 #define REAPERAPI_WANT_ShowConsoleMsg
@@ -88,14 +110,66 @@ public:
     virtual void SetPlayState(bool play, bool pause, bool rec);
     virtual void SetRepeatState(bool rep);
     virtual void Run();
+    virtual void SetSurfaceSelected(MediaTrack* track, bool selected);
+    virtual void SetTrackListChange();
+    void ToggleInstrumentMode();
+    void ExitInstrumentMode();
+    void ReconnectNi();
+    void ReportNiState();
+    void CaptureInstrumentHid();
 
-    enum ControlMode { MODE_MIXER = 0, MODE_FX, MODE_MIDI, MODE_EDIT, MODE_AUDIO };
+    enum ControlMode { MODE_MIXER = 0, MODE_FX, MODE_MIDI, MODE_EDIT, MODE_AUDIO, MODE_INSTRUMENT };
     enum SelectionMode { MODE_NORMAL, MODE_CHOOSING };
 
 private:
     int m_midi_in_dev, m_midi_out_dev;
 
-    midi_Output* m_midi_out;
+    midi_Output* m_midi_out = nullptr;
+    midi_Input* m_ni_input = nullptr;
+    unsigned char m_ni_version = 0;
+    soundfirst_ni::HelloRecovery m_ni_recovery;
+    unsigned int m_ni_received = 0, m_ni_cc_received = 0, m_ni_rejected = 0;
+    double m_ni_diagnostic_until = 0;
+    unsigned int m_ni_diagnostic_packets = 0;
+    void MaybeRecoverNiHello();
+    void ReportNiConnect(bool force = false);
+    std::string m_ni_last_connect_log;
+    bool m_ni_final_timeout_spoken = false;
+    std::string m_ni_session_state = "closed";
+    soundfirst_ni::DisplayCache m_display_cache;
+    double m_ni_started = 0;
+    bool m_ni_timeout_announced = false;
+    bool m_hid_baseline = false;
+    bool m_double_mode_exit = true;
+    double m_double_mode_window = 0.4;
+    soundfirst_ni::DoublePress m_mode_press;
+    bool m_double_track_exit = true;
+    double m_double_track_window = 0.4;
+    double m_hid_observed = 0;
+    double m_hid_capture_until = 0;
+    unsigned int m_hid_capture_packets = 0;
+    bool m_hold_undo_exit = false;
+    bool m_shift_track_exit = false;
+    double m_undo_pressed_at = -1;
+    soundfirst_ni::DoublePress m_track_press;
+    bool m_ni_feedback_dirty = true;
+    bool m_native_notice = false;
+    double m_ni_last_feedback = 0;
+    std::string m_ni_last_scan_log;
+    std::string m_ni_last_unavailable_log;
+    std::string m_ni_last_focus; // Detected ID, independent of active routing.
+    std::string m_ni_sent_focus;
+    bool m_ni_focus_sent = false;
+    bool m_ni_focus_instrument = false;
+    MediaTrack* m_ni_focus_track = nullptr;
+    void OpenNiSession();
+    void CloseNiSession();
+    void PumpNiInput();
+    void RefreshNiFocus(bool force = false);
+    void ReleaseTouchSolos();
+    void AdoptHidBaseline(const unsigned char* data);
+    void SendNiPacket(const soundfirst_ni::Packet& packet);
+    void HandleNiCommand(unsigned char command, unsigned char value);
     bool m_handshake_sent;
     int m_current_bank;
     ControlMode m_current_mode;
@@ -121,6 +195,7 @@ private:
 
     // Touch Auto-Solo State
     bool m_knob_touch_state[8];      // Current touch state for each knob
+    MediaTrack* m_touch_track[8] = {};
     int m_previous_solo_state[8];    // Solo state before touch (for restoration)
 
     // Dynamic Mode System
@@ -136,7 +211,7 @@ private:
     std::thread m_hid_thread;
     std::atomic<bool> m_hid_running;
     HANDLE m_hid_handle;
-    struct HidEvent { unsigned char data[64]; };
+    struct HidEvent { unsigned char data[64]; DWORD size = 0; double observed = 0; };
     std::queue<HidEvent> m_hid_queue;
     std::mutex m_hid_mutex;
     unsigned char m_last_hid_report[64];

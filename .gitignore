@@ -32,3 +32,6 @@ Desktop.ini
 # Logs
 *.txt
 recuerdos_*.md
+
+# Keep build instructions in source.
+!CMakeLists.txt

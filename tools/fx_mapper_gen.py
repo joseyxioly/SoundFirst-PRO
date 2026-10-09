@@ -55,7 +55,7 @@ class StartPanel(wx.Panel):
         
         sizer.AddStretchSpacer()
         
-        title = wx.StaticText(self, label="KompleteReaper FX Mapper")
+        title = wx.StaticText(self, label="SoundFirst PRO FX Mapper")
         font = title.GetFont()
         font.SetPointSize(16)
         font.MakeBold()

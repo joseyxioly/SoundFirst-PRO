@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo KompleteReaper Native - Build Script
+echo SoundFirst PRO - Build Script
 echo ========================================
 echo.
 
@@ -43,9 +43,9 @@ nmake
 if %ERRORLEVEL% NEQ 0 goto :error
 
 echo.
-if exist reaper_kompletereaper.dll (
+if exist reaper_soundfirst_pro.dll (
     echo Build successful! Copying to REAPER...
-    copy /y reaper_kompletereaper.dll "%APPDATA%\REAPER\UserPlugins\"
+    copy /y reaper_soundfirst_pro.dll "%APPDATA%\REAPER\UserPlugins\"
     if %ERRORLEVEL% EQU 0 (
         echo.
         echo ========================================

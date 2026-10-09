@@ -6,6 +6,7 @@
 
 #include "csurf_soundfirst.h"
 #include <windows.h>
+#include <mmsystem.h>
 #include <stdio.h>
 #include <cmath>
 #include <string>
@@ -89,15 +90,7 @@ CSurf_SoundFirst::CSurf_SoundFirst(int inDev, int outDev, int outDev2) {
 
 
 
-    m_midi_out = CreateMIDIOutput(m_midi_out_dev, false, NULL); 
-    if (m_midi_out) {
-        LogDebug("Sub-sistema MIDI Output: Activo.");
-        SendMidi(0xBF, 0x01, 0x01); // Activar modo Komplete Native
-        unsigned char sysex[] = { 0xF0, 0x00, 0x21, 0x09, 0x00, 0x00, 0x44, 0x43, 0x01, 0x00, 0x07, 0x07, 0x00, 0x52, 0x65, 0x61, 0x70, 0x65, 0x72, 0xF7 };
-        SendSysex(sysex, sizeof(sysex));
-        LogDebug("Handshake MIDI enviado al teclado.");
-    } else LogDebug("ERROR: Fallo al crear MIDI Output.");
-
+    // Session opens after application state has been initialized.
     m_current_bank = 0;
     m_current_mode = MODE_MIXER;
     m_fx_page = 0;
@@ -134,7 +127,7 @@ CSurf_SoundFirst::CSurf_SoundFirst(int inDev, int outDev, int outDev2) {
     // Mode system defaults
     // MIXER y FX tienen botones dedicados (TRACK / PLUGIN).
     // BROWSER rota solo entre MIDI y AUDIO.
-    m_available_modes = {"MIDI", "AUDIO"};
+    m_available_modes = {"MIDI", "AUDIO", "Instrument"};
     m_current_mode_idx = 0;
     m_browser_mode_selection = false;
     
@@ -143,13 +136,15 @@ CSurf_SoundFirst::CSurf_SoundFirst(int inDev, int outDev, int outDev2) {
     m_current_fx_plugin = "";
     
     LoadMappingConfig();
-    LoadMappingConfig();
     
     // FORCE MODE RESET (V1.0 Standard)
     // Ignore whatever the INI file said.
-    m_available_modes = {"MIDI", "AUDIO"};
+    m_available_modes = {"MIDI", "AUDIO", "Instrument"};
     m_current_mode_idx = 0;
     
+    memset(m_last_hid_report, 0, sizeof(m_last_hid_report));
+    std::fill(m_last_knob_values, m_last_knob_values + 8, -1);
+    OpenNiSession();
     m_hid_handle = INVALID_HANDLE_VALUE;
     m_hid_running = true;
     m_hid_thread = std::thread(&CSurf_SoundFirst::HidThreadLoop, this);
@@ -166,15 +161,17 @@ CSurf_SoundFirst::CSurf_SoundFirst(int inDev, int outDev, int outDev2) {
 }
 
 CSurf_SoundFirst::~CSurf_SoundFirst() {
+    ReleaseTouchSolos();
     m_hid_running = false;
-    if (m_hid_thread.joinable()) m_hid_thread.join();
+    if (m_hid_thread.joinable()) {
+        m_hid_thread.join();
+    }
     if (m_hid_handle != INVALID_HANDLE_VALUE) CloseHandle(m_hid_handle);
-    // MIDI Input removido
-    if (m_midi_out) delete m_midi_out;
+    CloseNiSession();
     ::CoUninitialize();
 }
 
-void CSurf_SoundFirst::CloseNoReset() { if (m_midi_out) { delete m_midi_out; m_midi_out = nullptr; } }
+void CSurf_SoundFirst::CloseNoReset() { CloseNiSession(); }
 
 const char* CSurf_SoundFirst::GetConfigString() {
     static char cfg[512]; sprintf(cfg, "%d %d", m_midi_in_dev, m_midi_out_dev);
@@ -182,22 +179,45 @@ const char* CSurf_SoundFirst::GetConfigString() {
 }
 
 
-int CSurf_SoundFirst::Extended(int call, void *parm1, void *parm2, void *parm3) { 
-    // TODO: Re-enable auto bank switching with correct REAPER constant
-    // Handle track selection changes for auto bank switching
-    // if (call == CSURF_EXT_SETTRACKLISTCHANGE) {
-        UpdateBankFromSelectedTrack();
-    // }
-    return (call == 0x00010000) ? 1 : 0; 
+int CSurf_SoundFirst::Extended(int call, void *parm1, void *parm2, void *parm3) {
+    if (call == CSURF_EXT_SETFXCHANGE) RefreshNiFocus(true);
+    UpdateBankFromSelectedTrack();
+    m_ni_feedback_dirty = true;
+    return 0;
 }
 
 void CSurf_SoundFirst::OnMIDIEvent(MIDI_event_t* evt) {
-    // MIDI Input ignorado (Usamos HID)
+    if (!evt || evt->size < 1) return;
+    ++m_ni_received;
+    soundfirst_ni::Command command;
+    const bool decoded=soundfirst_ni::decodeCc(evt->midi_message,evt->size,command);
+    if (decoded) ++m_ni_cc_received; else ++m_ni_rejected;
+    // Short startup diagnostic window, bounded packets and bytes. This logs
+    // the DAW protocol only, not the ordinary keybed music input.
+    if (time_precise()<=m_ni_diagnostic_until && m_ni_diagnostic_packets<24) {
+        ++m_ni_diagnostic_packets;
+        std::ostringstream raw;
+        raw << "[NI_MIDI_RX] size=" << evt->size << " decoded=" << decoded << " bytes=";
+        char octet[4];
+        for (int i=0;i<std::min(evt->size,24);++i) {
+            snprintf(octet,sizeof(octet),"%02X",evt->midi_message[i]); raw<<octet<<' ';
+        }
+        LogDebug(raw.str().c_str());
+    }
+    if (decoded) HandleNiCommand(command.number,command.value);
 }
 
 void CSurf_SoundFirst::Run() {
     CheckConfigHotReload();
+    PumpNiInput();
     ProcessHidQueue();
+    if (time_precise() - m_ni_last_feedback > 0.1) {
+        RefreshNiFocus();
+        MaybeRecoverNiHello();
+        ReportNiConnect();
+        m_ni_last_feedback = time_precise();
+    }
+    if (m_current_mode == MODE_INSTRUMENT) return;
     
     // --- DISPLAY LOOP ---
     UpdateDisplay(); // Handles Screensaver logic & Text Sync
@@ -311,7 +331,7 @@ void CSurf_SoundFirst::HidThreadLoop() {
             if (!path.empty()) {
                 LogDebug((std::string("Ruta HID encontrada: ") + path).c_str());
                 m_hid_handle = CreateFileA(path.c_str(), GENERIC_READ | GENERIC_WRITE, 
-                    FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+                    FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
                 if (m_hid_handle != INVALID_HANDLE_VALUE) {
                     LogDebug("Conexión HID establecida con éxito.");
                     std::this_thread::sleep_for(std::chrono::milliseconds(800));
@@ -327,7 +347,7 @@ void CSurf_SoundFirst::HidThreadLoop() {
             
             if (m_hid_handle == INVALID_HANDLE_VALUE) {
                 attempts++;
-                if (attempts == 3) SpeakText("Searching for Keyboard");
+                if (attempts == 3) LogDebug("Searching for Keyboard");
                 std::this_thread::sleep_for(std::chrono::seconds(5));
                 continue;
             }
@@ -336,7 +356,23 @@ void CSurf_SoundFirst::HidThreadLoop() {
         DWORD read = 0;
         // Request 64 bytes (Maximum Report Size). A-Series sends 30, M32 sends ~38. 
         // ReadFile will return what is available if we request enough.
-        if (ReadFile(m_hid_handle, buf, 64, &read, NULL) && read > 0) {
+        OVERLAPPED operation = {};
+        operation.hEvent = CreateEventA(nullptr, TRUE, FALSE, nullptr);
+        if (!operation.hEvent) {
+            CloseHandle(m_hid_handle); m_hid_handle = INVALID_HANDLE_VALUE;
+            continue;
+        }
+        BOOL complete = ReadFile(m_hid_handle, buf, 64, &read, &operation);
+        if (!complete && GetLastError() == ERROR_IO_PENDING) {
+            while (m_hid_running && WaitForSingleObject(operation.hEvent, 200) == WAIT_TIMEOUT) {}
+            if (!m_hid_running) {
+                CancelIoEx(m_hid_handle, &operation);
+                WaitForSingleObject(operation.hEvent, INFINITE);
+            }
+            complete = GetOverlappedResult(m_hid_handle, &operation, &read, FALSE);
+        }
+        CloseHandle(operation.hEvent);
+        if (complete && read > 0) {
             std::lock_guard<std::mutex> lock(m_hid_mutex);
             // Ensure we don't overflow internal fixed buffer (64)
             if (read > 64) read = 64; 
@@ -344,8 +380,14 @@ void CSurf_SoundFirst::HidThreadLoop() {
             HidEvent ev; 
             memset(ev.data, 0, 64);
             memcpy(ev.data, buf, read);
+            ev.size = read;
+            ev.observed = GetTickCount64() / 1000.0;
             m_hid_queue.push(ev);
-        } else { CloseHandle(m_hid_handle); m_hid_handle = INVALID_HANDLE_VALUE; }
+        } else {
+            CloseHandle(m_hid_handle); m_hid_handle = INVALID_HANDLE_VALUE;
+            std::lock_guard<std::mutex> lock(m_hid_mutex);
+            m_hid_queue.push(HidEvent{});
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
@@ -353,7 +395,28 @@ void CSurf_SoundFirst::HidThreadLoop() {
 void CSurf_SoundFirst::ProcessHidQueue() {
     std::lock_guard<std::mutex> lock(m_hid_mutex);
     while (!m_hid_queue.empty()) {
-        HandleHidReport(m_hid_queue.front().data);
+        const HidEvent& ev = m_hid_queue.front();
+        if (ev.size == 0) { ReleaseTouchSolos(); m_hid_baseline = false; m_track_press.reset(); m_mode_press.reset(); m_undo_pressed_at=-1; }
+        if (m_hid_capture_until > 0 && GetTickCount64()/1000.0 <= m_hid_capture_until && ev.size > 0) {
+            std::ostringstream report;
+            report << "[NI_CAPTURE] packet=" << ++m_hid_capture_packets
+                   << " time=" << ev.observed << " size=" << ev.size << " bytes=";
+            char octet[4];
+            for (DWORD byte=0; byte<ev.size; ++byte) {
+                snprintf(octet,sizeof(octet),"%02X",ev.data[byte]);
+                report << octet << ' ';
+            }
+            LogDebug(report.str().c_str());
+            if (m_hid_capture_packets >= 3000) {
+                m_hid_capture_until = 0; LogDebug("[NI_CAPTURE] packet limit reached");
+            }
+        } else if (m_hid_capture_until > 0 && GetTickCount64()/1000.0 > m_hid_capture_until) {
+            m_hid_capture_until=0; LogDebug("[NI_CAPTURE] 60 second capture finished");
+        }
+        if (ev.size >= 30) {
+            m_hid_observed = ev.observed;
+            HandleHidReport(const_cast<unsigned char*>(ev.data));
+        }
         m_hid_queue.pop();
     }
 }
@@ -701,11 +764,67 @@ void CSurf_SoundFirst::UpdateBankFromSelectedTrack() {
 void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
     ResetIdleTimer(); // Activity detected
     unsigned char* old = m_last_hid_report;
+    if (!m_hid_baseline) { AdoptHidBaseline(data); return; }
+    if (m_current_mode == MODE_INSTRUMENT) {
+        if (m_shift_track_exit && soundfirst_ni::shiftTrack(data[3],old[3],data[1])) {
+            LogDebug("[NI_EXIT_SHIFT_TRACK] Shift+TRACK observed; exit requested; NI can also switch instance");
+            ExitInstrumentMode(); AdoptHidBaseline(data); return;
+        }
+        if (m_hold_undo_exit) {
+            if (soundfirst_ni::risingBit(data[1],old[1],0x08)) {
+                m_undo_pressed_at=m_hid_observed;
+                LogDebug("[NI_EXIT_UNDO] press observed; hold >=1 second and release");
+            }
+            if (!(data[1]&0x08) && (old[1]&0x08) && m_undo_pressed_at >= 0) {
+                bool held=soundfirst_ni::heldEnough(m_undo_pressed_at,m_hid_observed,1.0);
+                m_undo_pressed_at=-1;
+                if (held) {
+                    LogDebug("[NI_EXIT_UNDO] held and released; exit requested");
+                    ExitInstrumentMode(); AdoptHidBaseline(data); return;
+                }
+                LogDebug("[NI_EXIT_UNDO] release before 1 second; no exit");
+            }
+        }
+        if (data[3] != old[3]) {
+            char diagnostic[96];
+            snprintf(diagnostic,sizeof(diagnostic),"[NI_HID_MODE] byte3 old=%02X new=%02X (Browser01 Plugin02 Track04)",old[3],data[3]);
+            LogDebug(diagnostic);
+        }
+        // The mode selector is the original Browser bit01, distinct from
+        // the Track-to-Mixer bit04. Each gesture has an independent timer.
+        // Both presses still reach native NI Browser; they are not consumed.
+        if (soundfirst_ni::risingBit(data[3],old[3],0x01)) {
+            if (!m_double_mode_exit) {
+                LogDebug("[NI_EXIT_MODE_SELECTOR] byte3 mask01 press; double exit disabled");
+            } else if (m_mode_press.press(m_hid_observed,m_double_mode_window)) {
+                LogDebug("[NI_EXIT_MODE_SELECTOR] byte3 mask01 second press in window; exit requested");
+                ExitInstrumentMode(); AdoptHidBaseline(data); return;
+            } else {
+                LogDebug("[NI_EXIT_MODE_SELECTOR] byte3 mask01 first press or window expired; waiting for second");
+            }
+        }
+        // Legacy double TRACK remains independent, with its original bit04.
+        // NI also receives those presses and may change native context.
+        if (soundfirst_ni::risingBit(data[3], old[3], 0x04)) {
+            if (!m_double_track_exit) {
+                LogDebug("[NI_EXIT_TRACK] byte3 mask04 TRACK-to-Mixer press; double exit disabled in INI");
+            } else if (m_track_press.press(m_hid_observed, m_double_track_window)) {
+                LogDebug("[NI_EXIT_TRACK] byte3 mask04 second press in window; exit requested");
+                ExitInstrumentMode();
+                AdoptHidBaseline(data);
+                return;
+            } else {
+                LogDebug("[NI_EXIT_TRACK] byte3 mask04 first press or previous window expired; waiting for second");
+            }
+        }
+        AdoptHidBaseline(data);
+        return;
+    }
     
     // --- VERIFIED A61 (PID 1750) GROUND TRUTH ---
     bool isShift = (data[1] & 0x01); m_shift_pressed = isShift;
 
-    if (memcmp(data, old, 64) != 0) {
+    if (m_hid_capture_until>0 && memcmp(data, old, 64) != 0) {
         char hex[128]; char* p = hex;
         for (int i = 0; i < 8; i++) p += sprintf(p, "%02X ", data[i]);
         char fullMsg[256]; sprintf(fullMsg, "[A61_TRUTH] %s", hex);
@@ -965,7 +1084,7 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
     // Byte 3: 4D NAV / MODES
     
     // DIAGNOSTIC LOGGING FOR BUTTONS (Byte 3)
-    if (data[3] != old[3]) {
+    if (m_hid_capture_until>0 && data[3] != old[3]) {
         char diag[64]; sprintf(diag, "Byte 3 Change: %02X (Was %02X)", data[3], old[3]);
         RawLog(diag);
     }
@@ -1071,6 +1190,11 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
             else if (m_available_modes[m_current_mode_idx] == "FX") m_current_mode = MODE_FX;
             else if (m_available_modes[m_current_mode_idx] == "MIDI") m_current_mode = MODE_MIDI;
             else if (m_available_modes[m_current_mode_idx] == "AUDIO") m_current_mode = MODE_AUDIO;
+            else if (m_available_modes[m_current_mode_idx] == "Instrument") {
+                ToggleInstrumentMode();
+                AdoptHidBaseline(data);
+                return;
+            }
              SpeakText(("Mode confirmed: " + m_available_modes[m_current_mode_idx]).c_str());
         } else {
             // Normal Click
@@ -1127,14 +1251,17 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
              if (m_current_mode == MODE_MIXER && m_touch_auto_solo) {
                  int track_idx = (m_current_bank * 8) + k;
                  MediaTrack* track = GetTrack(NULL, track_idx);
-                 if (track) {
+                 if (track || (!current_touch && m_knob_touch_state[k])) {
                      if (current_touch) {
                          // Save state and set Solo
+                         m_touch_track[k] = track; m_knob_touch_state[k] = true;
                          m_previous_solo_state[k] = *(int*)GetSetMediaTrackInfo(track, "I_SOLO", NULL);
                          int s = 1; GetSetMediaTrackInfo(track, "I_SOLO", &s);
                      } else {
                          // Restore state
-                         GetSetMediaTrackInfo(track, "I_SOLO", &m_previous_solo_state[k]);
+                         if (m_touch_track[k] && ValidatePtr2(nullptr,m_touch_track[k],"MediaTrack*"))
+                             GetSetMediaTrackInfo(m_touch_track[k], "I_SOLO", &m_previous_solo_state[k]);
+                         m_touch_track[k] = nullptr; m_knob_touch_state[k] = false;
                      }
                  }
              }
@@ -1153,12 +1280,15 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
              if (m_current_mode == MODE_MIXER && m_touch_auto_solo) {
                  int track_idx = (m_current_bank * 8) + 7;
                  MediaTrack* track = GetTrack(NULL, track_idx);
-                 if (track) {
+                 if (track || (!current_touch && m_knob_touch_state[7])) {
                      if (current_touch) {
+                         m_touch_track[7] = track; m_knob_touch_state[7] = true;
                          m_previous_solo_state[7] = *(int*)GetSetMediaTrackInfo(track, "I_SOLO", NULL);
                          int s = 1; GetSetMediaTrackInfo(track, "I_SOLO", &s);
                      } else {
-                         GetSetMediaTrackInfo(track, "I_SOLO", &m_previous_solo_state[7]);
+                         if (m_touch_track[7] && ValidatePtr2(nullptr,m_touch_track[7],"MediaTrack*"))
+                             GetSetMediaTrackInfo(m_touch_track[7], "I_SOLO", &m_previous_solo_state[7]);
+                         m_touch_track[7] = nullptr; m_knob_touch_state[7] = false;
                      }
                  }
              } else if (m_current_mode == MODE_FX) {
@@ -1527,7 +1657,7 @@ void CSurf_SoundFirst::LoadMappingConfig() {
     m_nhl_actions["ENC_PRESS"] = "40294";
 
     std::ifstream f(m_config_path);
-    if (!f.is_open()) return;
+    if (!f.is_open()) { LogDebug("[NI_CONFIG] INI not found; DoubleModeExit and legacy DoubleTrackExit default ON"); return; }
     
     std::string line, sec;
     std::vector<std::string> loaded_modes; // Temporary storage for modes
@@ -1548,6 +1678,32 @@ void CSurf_SoundFirst::LoadMappingConfig() {
         }
 
         
+        // Optional Instrument exit gesture. Fail closed on invalid config.
+        else if (sec == "INSTRUMENT") {
+            try {
+                if (k == "DoubleModeExit") {
+                    m_double_mode_exit=std::stoi(v)!=0;
+                    LogDebug(m_double_mode_exit ? "[NI_CONFIG] DoubleModeExit ON (selector byte3 mask01)" : "[NI_CONFIG] DoubleModeExit OFF");
+                }
+                else if (k == "DoubleModeWindowMs")
+                    m_double_mode_window=std::clamp(std::stoi(v),150,1000)/1000.0;
+                else if (k == "DoubleTrackExit") {
+                    m_double_track_exit = std::stoi(v) != 0;
+                    LogDebug(m_double_track_exit ? "[NI_CONFIG] DoubleTrackExit ON" : "[NI_CONFIG] DoubleTrackExit OFF");
+                }
+                else if (k == "ShiftTrackExit") {
+                    m_shift_track_exit=std::stoi(v)!=0;
+                    LogDebug(m_shift_track_exit ? "[NI_CONFIG] ShiftTrackExit ON" : "[NI_CONFIG] ShiftTrackExit OFF");
+                }
+                else if (k == "HoldUndoExit") {
+                    m_hold_undo_exit=std::stoi(v)!=0;
+                    LogDebug(m_hold_undo_exit ? "[NI_CONFIG] HoldUndoExit ON" : "[NI_CONFIG] HoldUndoExit OFF");
+                }
+                else if (k == "DoubleTrackWindowMs")
+                    m_double_track_window = std::clamp(std::stoi(v), 150, 1000) / 1000.0;
+            } catch (...) { LogDebug("Invalid Instrument config ignored"); }
+            m_track_press.reset(); m_mode_press.reset();
+        }
         // Section: MODES
         else if (sec == "MODES") {
             if (k.find("Mode") == 0) {
@@ -1614,16 +1770,12 @@ void CSurf_SoundFirst::LoadMappingConfig() {
 
 void CSurf_SoundFirst::SwitchMode(ControlMode m) { m_current_mode = m; }
 void CSurf_SoundFirst::LogDebug(const char* text) {
-    char* appData = getenv("APPDATA");
-    if (appData) {
-        char path[512]; sprintf(path, "%s\\REAPER\\UserPlugins\\SoundFirst_Logs.txt", appData);
-        FILE* f = fopen(path, "a");
-        if (f) {
-            SYSTEMTIME st; GetLocalTime(&st);
-            fprintf(f, "[%02d:%02d:%02d] %s\n", st.wHour, st.wMinute, st.wSecond, text);
-            fclose(f);
-        }
-    }
+    if (!text) return;
+    char* appData=getenv("APPDATA");
+    if (!appData) return;
+    char path[512]; sprintf(path,"%s\\REAPER\\UserPlugins\\SoundFirst_Logs.txt",appData);
+    FILE* f=fopen(path,"a");
+    if (f) { fprintf(f,"%s\n",text); fclose(f); }
 }
 
 // Header for string safety
@@ -1650,11 +1802,14 @@ void CSurf_SoundFirst::SpeakText(const char* text) {
 }
 
 void CSurf_SoundFirst::SendMidi(unsigned char s, unsigned char d1, unsigned char d2) { 
-    if (m_midi_out) { MIDI_event_t e; e.frame_offset = 0; e.size = 3; e.midi_message[0] = s; e.midi_message[1] = d1; e.midi_message[2] = d2; m_midi_out->SendMsg(&e, 0); }
+    const unsigned char bytes[] = {s,d1,d2};
+    if (!soundfirst_ni::allowOutput(m_current_mode == MODE_INSTRUMENT,bytes,3)) return;
+    if (m_midi_out) m_midi_out->Send(s,d1,d2,-1);
 }
 
 
 void CSurf_SoundFirst::SendSysex(unsigned char* d, int l) {
+    if (l < 0 || !soundfirst_ni::allowOutput(m_current_mode == MODE_INSTRUMENT,d,std::size_t(l))) return;
     if (m_midi_out) { 
         // Safer vector-based allocation
         std::vector<char> evt(sizeof(MIDI_event_t) + l);
@@ -1662,19 +1817,19 @@ void CSurf_SoundFirst::SendSysex(unsigned char* d, int l) {
         e->frame_offset = 0; 
         e->size = l; 
         memcpy(e->midi_message, d, l); 
-        m_midi_out->SendMsg(e, 0); 
+        m_midi_out->SendMsg(e, -1); 
     }
 }
 
 
 
-void CSurf_SoundFirst::SetSurfaceVolume(MediaTrack* t, double v) {}
-void CSurf_SoundFirst::SetSurfacePan(MediaTrack* t, double p) {}
-void CSurf_SoundFirst::SetSurfaceMute(MediaTrack* t, bool m) {}
-void CSurf_SoundFirst::SetSurfaceSolo(MediaTrack* t, bool s) {}
-void CSurf_SoundFirst::SetSurfaceRecArm(MediaTrack* t, bool r) {}
-void CSurf_SoundFirst::SetPlayState(bool p, bool pa, bool r) {}
-void CSurf_SoundFirst::SetRepeatState(bool r) {}
+void CSurf_SoundFirst::SetSurfaceVolume(MediaTrack* t, double v) { m_ni_feedback_dirty = true; }
+void CSurf_SoundFirst::SetSurfacePan(MediaTrack* t, double p) { m_ni_feedback_dirty = true; }
+void CSurf_SoundFirst::SetSurfaceMute(MediaTrack* t, bool m) { m_ni_feedback_dirty = true; }
+void CSurf_SoundFirst::SetSurfaceSolo(MediaTrack* t, bool s) { m_ni_feedback_dirty = true; }
+void CSurf_SoundFirst::SetSurfaceRecArm(MediaTrack* t, bool r) { m_ni_feedback_dirty = true; }
+void CSurf_SoundFirst::SetPlayState(bool p, bool pa, bool r) { m_ni_feedback_dirty = true; }
+void CSurf_SoundFirst::SetRepeatState(bool r) { m_ni_feedback_dirty = true; }
 
 // --- DISPLAY ENGINE ---
 
@@ -1749,18 +1904,20 @@ static void PadString(char* dest, const char* src, int length) {
 
 // Send MIDI CC Helper (Direct to MIDI Out)
 void CSurf_SoundFirst::SendMidiCC(int cc, int val) {
-    if (m_midi_out) m_midi_out->Send(0xB0, cc, val, -1);
+    // Custom display/bank mapping belongs to SoundFirst only outside Instrument.
+    if (m_current_mode == MODE_INSTRUMENT) return;
+    if (m_midi_out) m_midi_out->Send(0xBF, cc, val, -1);
 }
 
 void CSurf_SoundFirst::UpdateDisplay() {
-    static char last_line1[64] = "";
-    static char last_line2_name[64] = "";
-    static char last_line2_val[64] = "";
-    static bool last_screensaver = false;
-    static bool last_browser_mode = false;
-    static int last_track_available = -1; // -1 Force update
-    static int last_track_selected = -1;
-    static int last_mode_force = -1; // 0=Mixer, 1=Plugin
+    if (m_current_mode == MODE_INSTRUMENT) return;
+    auto& last_line1 = m_display_cache.line1;
+    auto& last_line2_name = m_display_cache.line2_name;
+    auto& last_line2_val = m_display_cache.line2_value;
+    auto& last_screensaver = m_display_cache.screensaver;
+    auto& last_browser_mode = m_display_cache.selector;
+    auto& last_track_available = m_display_cache.track_available;
+    auto& last_mode_force = m_display_cache.bank_mapping;
 
     // Force Mode refresh periodically? No, just on change.
     
@@ -1775,7 +1932,7 @@ void CSurf_SoundFirst::UpdateDisplay() {
         if (!last_screensaver) {
             m_screensaver_active = true;
             last_screensaver = true;
-            // Force Plugin Mode for custom text (Screensaver)
+            // FX bank mapping for custom text; this is not native Browser ownership.
             if (last_mode_force != 1) { SendMidiCC(5, 1); last_mode_force = 1; }
             
             SendLCDMessage(0x48, "SoundFirst PRO                  "); 
@@ -1802,7 +1959,7 @@ void CSurf_SoundFirst::UpdateDisplay() {
         if (!last_browser_mode) {
              last_line1[0] = 0; last_line2_name[0] = 0; last_line2_val[0] = 0;
              last_browser_mode = true;
-             // Force Plugin Mode to show "Select Mode"
+             // FX bank mapping for selector text, not a native Plugin/Browser switch.
              if (last_mode_force != 1) { SendMidiCC(5, 1); last_mode_force = 1; }
         }
         
@@ -1849,11 +2006,11 @@ void CSurf_SoundFirst::UpdateDisplay() {
     }
 
     // Determine Mode for Display
-    int desired_mode = 0; // Default Mixer
+    int desired_mode = 0; // Track bank mapping
     
     // Line 2: Mode Context
     if (m_current_mode == MODE_FX) {
-        desired_mode = 1; // Plugin Mode
+        desired_mode = 1; // FX bank mapping
         if (tr) {
              char fxName[256];
              if (TrackFX_GetFXName(tr, m_selected_fx_index, fxName, 256)) {
@@ -1888,7 +2045,7 @@ void CSurf_SoundFirst::UpdateDisplay() {
     
     // 5. SEND UPDATES
     
-    // Mode Switch (CC 5)
+    // Bank mapping (CC 05 on channel 16): tracks=0, FX mapping=1.
     if (desired_mode != last_mode_force) {
         SendMidiCC(5, desired_mode); 
         last_mode_force = desired_mode;
@@ -1937,3 +2094,331 @@ void CSurf_SoundFirst::UpdateDisplay() {
     }
 }
 
+
+// Instrument mode bridge: independent implementation of INSTRUMENT_MODE_SPEC.md.
+void CSurf_SoundFirst::SendNiPacket(const soundfirst_ni::Packet& packet) {
+    if (packet.size()==3 && packet[0]==0xBF) {
+        SendMidi(packet[0],packet[1],packet[2]);
+    } else if (!packet.empty()) {
+        SendSysex(const_cast<unsigned char*>(packet.data()),int(packet.size()));
+    }
+}
+
+void CSurf_SoundFirst::OpenNiSession() {
+    m_ni_version = 0;
+    m_ni_recovery.reset();
+    m_ni_final_timeout_spoken=false; m_ni_last_connect_log.clear();
+    m_ni_received=0; m_ni_cc_received=0; m_ni_rejected=0;
+    m_ni_diagnostic_packets=0; m_ni_diagnostic_until=time_precise()+12;
+    m_ni_session_state = "discovering";
+    LogDebug("[NI_SESSION] scanning A/M DAW endpoints");
+    int input = -1, output = -1, inputCount = 0, outputCount = 0;
+    std::string inputFamily, outputFamily;
+    auto suitable = [](const char* name) {
+        const std::string n(name);
+        return n.find("Komplete Kontrol A DAW") != std::string::npos ||
+               n.find("Komplete Kontrol M DAW") != std::string::npos;
+    };
+    for (int i = 0; i < GetNumMIDIInputs(); ++i) {
+        char name[256] = {};
+        const bool present = GetMIDIInputName(i, name, sizeof(name));
+        if (present && suitable(name)) LogDebug(("[NI_ENDPOINT] input=" + std::to_string(i) + " present=" + std::to_string(present) + " name=" + name).c_str());
+        if (present && suitable(name)) {
+            input = i; ++inputCount;
+            inputFamily = std::string(name).find("Kontrol A DAW") != std::string::npos ? "A" : "M";
+        }
+    }
+    for (int i = 0; i < GetNumMIDIOutputs(); ++i) {
+        char name[256] = {};
+        const bool present = GetMIDIOutputName(i, name, sizeof(name));
+        if (present && suitable(name)) LogDebug(("[NI_ENDPOINT] output=" + std::to_string(i) + " present=" + std::to_string(present) + " name=" + name).c_str());
+        if (present && suitable(name)) {
+            output = i; ++outputCount;
+            outputFamily = std::string(name).find("Kontrol A DAW") != std::string::npos ? "A" : "M";
+        }
+    }
+    if (inputCount != 1 || outputCount != 1 || inputFamily != outputFamily) {
+        m_ni_session_state = "missing or ambiguous DAW endpoints";
+        LogDebug(("[NI_SESSION] missing/ambiguous pair; input matches=" + std::to_string(inputCount) + " output matches=" + std::to_string(outputCount) + " families=" + inputFamily + "/" + outputFamily + "; no fallback").c_str());
+        return;
+    }
+    m_midi_in_dev = input; m_midi_out_dev = output;
+    LogDebug(("[NI_SESSION] opening input=" + std::to_string(input) + " output=" + std::to_string(output)).c_str());
+    m_ni_input = CreateMIDIInput(input);
+    if (!m_ni_input) { m_ni_session_state = "DAW input open failed"; LogDebug("[NI_SESSION] cannot open DAW input; ownership/availability not determined"); return; }
+    m_midi_out = CreateMIDIOutput(output, false, nullptr);
+    if (!m_midi_out) {
+        delete m_ni_input; m_ni_input = nullptr;
+        m_ni_session_state = "DAW output open failed";
+        LogDebug("[NI_SESSION] cannot open DAW output; ownership/availability not determined"); return;
+    }
+    m_ni_input->start();
+    m_ni_started = time_precise(); m_ni_timeout_announced = false;
+    m_ni_version = 0;
+    m_ni_session_state = "awaiting ACK";
+    SendNiPacket(soundfirst_ni::hello());
+    m_ni_recovery.sent(time_precise());
+    LogDebug("[NI_SESSION] DAW pair opened; HELLO BF0104 attempt=1; awaiting ACK.");
+}
+
+void CSurf_SoundFirst::CloseNiSession() {
+    if (m_midi_out) SendNiPacket(soundfirst_ni::goodbye());
+    if (m_ni_input) { m_ni_input->stop(); delete m_ni_input; m_ni_input = nullptr; }
+    if (m_midi_out) { delete m_midi_out; m_midi_out = nullptr; }
+    m_ni_version = 0;
+    m_ni_session_state = "closed";
+    m_ni_recovery.reset();
+    m_ni_focus_track = nullptr; m_ni_last_focus.clear();
+    m_ni_sent_focus.clear(); m_ni_focus_sent=false; m_ni_focus_instrument=false;
+    m_ni_last_scan_log.clear(); m_ni_last_unavailable_log.clear();
+}
+
+void CSurf_SoundFirst::ReconnectNi() {
+    CloseNiSession(); OpenNiSession();
+    m_display_cache.invalidate();
+    SpeakText("Reconnecting NI DAW session");
+}
+
+void CSurf_SoundFirst::PumpNiInput() {
+    if (!m_ni_input) return;
+    m_ni_input->SwapBufs(timeGetTime());
+    MIDI_eventlist* events = m_ni_input->GetReadBuf();
+    int position = 0;
+    while (MIDI_event_t* event = events->EnumItems(&position)) OnMIDIEvent(event);
+    if (!m_ni_version && !m_ni_timeout_announced && time_precise() - m_ni_started > 3) {
+        m_ni_timeout_announced = true;
+        m_ni_session_state = "ACK timeout";
+        LogDebug(("[NI_SESSION] ACK timeout after HELLO attempt="+std::to_string(m_ni_recovery.attempts())+
+            " received="+std::to_string(m_ni_received)+" decodedCC="+std::to_string(m_ni_cc_received)+
+            " rejected="+std::to_string(m_ni_rejected)+"; recovery requires Instrument+NI ID; max3 attempts/session").c_str());
+        if (m_current_mode==MODE_INSTRUMENT && m_ni_recovery.attempts()>=3 &&
+            !m_ni_final_timeout_spoken) {
+            m_ni_final_timeout_spoken=true;
+            SpeakText("NI DAW acknowledgement not confirmed after three attempts. Use reconnect.");
+        }
+    }
+}
+
+void CSurf_SoundFirst::RefreshNiFocus(bool force) {
+    MediaTrack* track = GetSelectedTrack(nullptr, 0);
+    std::string id;
+    if (track) {
+        for (int fx = 0; fx < TrackFX_GetCount(track) && id.empty(); ++fx) {
+            const int count = TrackFX_GetNumParams(track, fx);
+            for (int parameter : {0, 128, 2048, 4096}) {
+                if (parameter >= count) continue;
+                char name[128] = {};
+                if (TrackFX_GetParamName(track, fx, parameter, name, sizeof(name)) &&
+                    soundfirst_ni::validInstance(name)) { id = name; break; }
+            }
+        }
+    }
+    const bool instrument = m_current_mode == MODE_INSTRUMENT;
+    const std::string requested = soundfirst_ni::selectedFocus(instrument,id);
+    const std::string scan="[NI_FOCUS_SCAN] detected="+(id.empty()?std::string("NONE"):id)+
+        " routing="+(instrument?"Instrument":"custom");
+    if (scan!=m_ni_last_scan_log) { LogDebug(scan.c_str()); m_ni_last_scan_log=scan; }
+    if (m_midi_out && (!m_ni_focus_sent || requested != m_ni_sent_focus ||
+                      instrument != m_ni_focus_instrument)) {
+        SendNiPacket(soundfirst_ni::focus(requested));
+        m_ni_sent_focus=requested; m_ni_focus_sent=true;
+        LogDebug(("[NI_FOCUS_SENT] "+(requested.empty()?std::string("EMPTY"):requested)+
+                  " ACK="+std::to_string(m_ni_version)).c_str());
+    } else if (!m_midi_out && m_ni_last_unavailable_log!=scan) {
+        LogDebug("[NI_FOCUS] output unavailable; scan only"); m_ni_last_unavailable_log=scan;
+    }
+    m_ni_focus_track=track; m_ni_last_focus=id;
+    m_ni_focus_instrument=instrument;
+
+}
+
+void CSurf_SoundFirst::MaybeRecoverNiHello() {
+    const double now=time_precise();
+    if (!m_ni_recovery.due(now,m_current_mode==MODE_INSTRUMENT,
+                          !m_ni_last_focus.empty(),m_ni_version!=0,
+                          m_ni_input && m_midi_out)) return;
+    SendNiPacket(soundfirst_ni::hello());
+    m_ni_recovery.sent(now);
+    m_ni_started=now; m_ni_timeout_announced=false;
+    m_ni_session_state="awaiting ACK (bounded retry)";
+    m_ni_diagnostic_until=now+4; // packet budget is NOT reset by retry
+    LogDebug(("[NI_HELLO_RETRY] BF0104 attempt="+std::to_string(m_ni_recovery.attempts())+
+        "/3; Instrument detected="+m_ni_last_focus+"; ports retained").c_str());
+}
+
+void CSurf_SoundFirst::ReportNiConnect(bool force) {
+    const bool input=m_ni_input!=nullptr, output=m_midi_out!=nullptr;
+    const std::string phase=soundfirst_ni::connectionPhase(input && output,m_ni_version!=0,
+        m_ni_timeout_announced,m_ni_recovery.attempts(),m_current_mode==MODE_INSTRUMENT,
+        !m_ni_last_focus.empty());
+    // RX counters belong in this compact snapshot, but do not generate a new
+    // line for every packet. Automatic output changes only on connection state.
+    const std::string state="state="+phase+" ACK="+std::to_string(m_ni_version)+
+        " in="+std::to_string(input)+" out="+std::to_string(output)+
+        " ID="+(m_ni_last_focus.empty()?std::string("NONE"):m_ni_last_focus)+
+        " hello="+std::to_string(m_ni_recovery.attempts())+"/3";
+    if (force || state!=m_ni_last_connect_log) {
+        LogDebug(("[NI_CONNECT] "+state+" rx="+std::to_string(m_ni_received)+
+            " cc="+std::to_string(m_ni_cc_received)+" rejected="+std::to_string(m_ni_rejected)).c_str());
+        m_ni_last_connect_log=state;
+    }
+}
+
+void CSurf_SoundFirst::SetSurfaceSelected(MediaTrack* track, bool selected) {
+    if (!selected) return;
+    UpdateBankFromSelectedTrack();
+    RefreshNiFocus(true); m_ni_feedback_dirty = true;
+}
+void CSurf_SoundFirst::SetTrackListChange() {
+    while (m_current_bank > 0 && !GetTrack(nullptr,m_current_bank*8)) --m_current_bank;
+    m_ni_feedback_dirty = true; RefreshNiFocus(true);
+}
+
+void CSurf_SoundFirst::HandleNiCommand(unsigned char command, unsigned char value) {
+    if (command == 1) {
+        if (!value) { LogDebug("[NI_ACK] zero version ignored"); return; }
+        m_ni_version = value;
+        m_ni_final_timeout_spoken=false;
+        m_ni_focus_sent=false; // Re-announce desired focus after negotiation.
+        m_ni_session_state = "confirmed";
+        if (m_current_mode != MODE_INSTRUMENT) m_display_cache.invalidate();
+        LogDebug(("[NI_ACK] version=" + std::to_string(value)).c_str());
+        SendNiPacket(soundfirst_ni::sysex(3,1,0,"track_orientation"));
+        RefreshNiFocus(true); m_ni_feedback_dirty = true;
+        return;
+    }
+    // No DAW command mutates REAPER in Instrument. Outside Instrument the
+    // existing HID handlers own actions, so MIDI cannot duplicate them either.
+    if (soundfirst_ni::allowDawAction(m_current_mode == MODE_INSTRUMENT,m_ni_version != 0,command)) {
+        // The current routing policy deliberately never reaches this branch.
+        return;
+    }
+    if (m_current_mode == MODE_INSTRUMENT && !m_native_notice) {
+        m_native_notice=true;
+        char diagnostic[96];
+        snprintf(diagnostic,sizeof(diagnostic),"[NI_DAW_IGNORED] command=%02X value=%02X; no SoundFirst action",command,value);
+        LogDebug(diagnostic);
+    }
+}
+
+
+void CSurf_SoundFirst::AdoptHidBaseline(const unsigned char* data) {
+    memcpy(m_last_hid_report,data,64);
+    m_shift_pressed = (data[1] & 1) != 0;
+    for (int i = 0; i < 8; ++i) m_last_knob_values[i] = data[6+i*2] | (data[7+i*2] << 8);
+    m_hid_baseline = true;
+}
+
+void CSurf_SoundFirst::ReleaseTouchSolos() {
+    // Restore only touch states owned by this surface, never an unrelated solo.
+    for (int k = 0; k < 8; ++k) {
+        if (!m_knob_touch_state[k]) continue;
+        MediaTrack* t = m_touch_track[k];
+        if (t && ValidatePtr2(nullptr,t,"MediaTrack*"))
+            GetSetMediaTrackInfo(t,"I_SOLO",&m_previous_solo_state[k]);
+        m_knob_touch_state[k] = false; m_touch_track[k] = nullptr;
+    }
+    if (m_current_mode == MODE_FX && m_touch_auto_solo) {
+        for (int k = 0; k < 8; ++k) {
+            const bool touched = k == 7 ? (m_last_hid_report[5]&1) != 0 :
+                                          (m_last_hid_report[4]&(1<<(k+1))) != 0;
+            if (touched) HandleFxTouch(k,false);
+        }
+    }
+}
+
+void CSurf_SoundFirst::ToggleInstrumentMode() {
+    if (m_current_mode == MODE_INSTRUMENT) {
+        ExitInstrumentMode();
+        return;
+    } else {
+        PumpNiInput();
+        ReleaseTouchSolos();
+        m_display_cache.invalidate();
+        m_current_mode = MODE_INSTRUMENT;
+        m_browser_mode_selection = false;
+        m_ni_feedback_dirty = true;
+        RefreshNiFocus(true);
+        MaybeRecoverNiHello();
+        SpeakText("Instrument mode. Press Plugin, then Browser to control Komplete Kontrol. Press Browser twice to leave Instrument mode.");
+        if (!m_ni_input || !m_midi_out)
+            SpeakText(("NI DAW ports unavailable. " + m_ni_session_state + ". Use reconnect.").c_str());
+        else if (m_ni_timeout_announced && m_ni_recovery.attempts()>=3)
+            SpeakText("NI DAW acknowledgement not confirmed after three attempts. Use reconnect.");
+        ReportNiConnect();
+    }
+    // Keep the last received baseline: otherwise the first exit-button press after
+    // an action-triggered mode entry could be swallowed as initialization.
+    m_track_press.reset(); m_mode_press.reset();
+    m_undo_pressed_at=-1;
+    m_native_notice = false;
+    LogDebug((std::string("[NI_MODE] ") + (m_current_mode == MODE_INSTRUMENT ? "Instrument" : "Mixer") +
+              " ACK=" + std::to_string(m_ni_version) + " detected=" +
+              (m_ni_last_focus.empty() ? "NONE" : m_ni_last_focus)).c_str());
+    if (m_current_mode == MODE_INSTRUMENT && m_ni_version) {
+        if (m_ni_last_focus.empty()) SpeakText("No NI instance ID found on the selected track");
+    }
+    ResetIdleTimer();
+}
+
+
+void CSurf_SoundFirst::ReportNiState() {
+    PumpNiInput();
+    RefreshNiFocus(true);
+    ReportNiConnect(true);
+    const std::string status = std::string("NI DAW version ") + std::to_string(m_ni_version) +
+        ". Session " + m_ni_session_state +
+        ". " + (m_ni_last_focus.empty() ? "No instance ID found on selected track" : "Instance ID " + m_ni_last_focus) +
+        ". NI instance routing " + (m_current_mode == MODE_INSTRUMENT ? "Instrument enabled" : "custom disabled") +
+        ". Last transmitted focus " + (!m_ni_focus_sent ? "not sent; output unavailable" : m_ni_sent_focus.empty() ? "empty" : m_ni_sent_focus) +
+        ". HELLO attempts " + std::to_string(m_ni_recovery.attempts()) +
+        ". MIDI received " + std::to_string(m_ni_received) +
+        ", decoded CC " + std::to_string(m_ni_cc_received) +
+        ", rejected " + std::to_string(m_ni_rejected) +
+        ". Mode " + std::string(m_current_mode == MODE_INSTRUMENT ? "Instrument" : "Mixer or custom") +
+        ". Double mode selector exit (Browser bit01) " + (m_double_mode_exit ? "on" : "off") +
+        ". Legacy double Track exit (bit04) " + (m_double_track_exit ? "on" : "off") +
+        ". HID " + (m_hid_baseline ? "reports received" : "baseline not received");
+    SpeakText("NI connection status written to the log."); LogDebug(("[NI_STATUS] " + status).c_str());
+    MediaTrack* track = GetSelectedTrack(nullptr,0);
+    if (!track) { LogDebug("[NI_SCAN] no selected track"); return; }
+    for (int fx = 0; fx < TrackFX_GetCount(track); ++fx) {
+        char name[256] = {};
+        TrackFX_GetFXName(track,fx,name,sizeof(name));
+        const int count = TrackFX_GetNumParams(track,fx);
+        LogDebug(("[NI_SCAN] FX=" + std::to_string(fx) + " name=" + name + " params=" + std::to_string(count)).c_str());
+        for (int param : {0,128,2048,4096}) {
+            if (param >= count) continue;
+            char parameter[128] = {};
+            TrackFX_GetParamName(track,fx,param,parameter,sizeof(parameter));
+            LogDebug(("[NI_SCAN] candidate=" + std::to_string(param) + " name=" + parameter).c_str());
+        }
+    }
+}
+
+
+void CSurf_SoundFirst::ExitInstrumentMode() {
+    const bool wasInstrument = m_current_mode == MODE_INSTRUMENT;
+    m_current_mode = MODE_MIXER;
+    m_browser_mode_selection = false;
+    RefreshNiFocus(true); // Withdraw only the NI instance link announced by this surface.
+    m_track_press.reset(); m_mode_press.reset();
+    m_undo_pressed_at=-1;
+    m_native_notice = false;
+    m_display_cache.invalidate();
+    m_screensaver_active = false;
+    LogDebug(wasInstrument ? "[NI_EXIT] Instrument -> Mixer; custom HID routing restored" :
+                            "[NI_EXIT] already outside Instrument; Mixer selected");
+    // This changes SoundFirst only. It does not revoke native NI ownership.
+    ResetIdleTimer();
+    UpdateDisplay(); // Restore complete Mixer state even when values match pre-entry.
+    SpeakText("Mixer mode. To control Komplete Kontrol, press Browser, choose Instrument with the encoder and press it. Then press Plugin, followed by Browser.");
+}
+
+
+void CSurf_SoundFirst::CaptureInstrumentHid() {
+    m_hid_capture_packets=0;
+    m_hid_capture_until=GetTickCount64()/1000.0+60;
+    LogDebug("[NI_CAPTURE] start 60 seconds; all HID reports including duplicates/short reports; no interpretation");
+    SpeakText("HID capture started for sixty seconds. Press only the controls you want to test");
+}

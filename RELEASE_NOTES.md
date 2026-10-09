@@ -1,0 +1,53 @@
+# SoundFirst PRO: native NKS instruments in the workflow
+
+Instrument mode brings Komplete Kontrol's native NKS controls into SoundFirst
+PRO. Select and arm a track, choose Instrument, press Plugin then Browser, and
+play or change your instrument. Press Browser twice to return to SoundFirst.
+
+You can move between a piano on one Komplete Kontrol track and a guitar on
+another, then switch to MIDI editing for what you recorded. José tested that
+workflow on his A61. A49/M32 Instrument testing remains open.
+
+## The workflow
+
+1. Select and arm the track containing Komplete Kontrol.
+2. Press Browser, choose Instrument with the encoder, then press the encoder.
+3. Press Plugin, followed by Browser, for native NI/NKS controls.
+4. Play, browse presets or change the instrument.
+5. Press Browser twice to leave Instrument. Disarm that track.
+6. Select and arm the next track and repeat, or use Browser+encoder to choose
+   Audio or MIDI editing outside Instrument.
+
+The armed-track workflow is José's tested setup. The integration actually finds
+the first NI instance on the selected track, so keep selection and arming aligned.
+It does not select automatically among multiple armed tracks.
+
+## Upgrade
+
+Close REAPER and move `reaper_kompletereaper.dll` out of `UserPlugins`. Install
+`reaper_soundfirst_pro.dll` instead. Do not load both extensions.
+This package is source only; compilation and installation are described in
+[README](README.md). No prebuilt binary is included.
+
+## What changed
+
+- Instrument pauses SoundFirst custom HID/MIDI actions and custom screen writes.
+- NI instance routing is limited by SoundFirst mode; native physical NI context
+  still needs Plugin followed by Browser.
+- Double Browser exits Instrument, with an independent legacy double Track exit.
+- Session recovery is bounded and diagnostics are compact, without timestamps.
+- Pending ACK stays in the log; voice guides the next action. Real port/final
+  timeout failures still receive a spoken warning.
+- Product and Windows DLL names now match SoundFirst PRO.
+
+## Limits
+
+Native NI entry/exit and HID behavior depend on NI software and keyboard state.
+SoundFirst cannot consume native button events or guarantee that NI ignores the
+encoder in other contexts. Selected-track top-level NI instances are supported;
+nested, input and take FX are not covered by this version.
+
+Automated tests and Windows syntax checks passed. No full MSVC link/load test,
+prebuilt DLL or hardware testing on A49/M32 is claimed by this source package.
+For connection trouble, check USB, use Reconnect NI DAW, then Report NI connection
+and focus. The `[NI_CONNECT]` line gives a compact connection summary.
