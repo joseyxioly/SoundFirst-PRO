@@ -334,6 +334,10 @@ void CSurf_SoundFirst::HidThreadLoop() {
                     FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
                 if (m_hid_handle != INVALID_HANDLE_VALUE) {
                     LogDebug("Conexión HID establecida con éxito.");
+                    std::string lowerPath = path;
+                    std::transform(lowerPath.begin(), lowerPath.end(), lowerPath.begin(), ::tolower);
+                    m_encoder_byte = (lowerPath.find("pid_1860") != std::string::npos) ? 24 : 28;
+                    LogDebug(m_encoder_byte == 24 ? "[HID_LAYOUT] M32: encoder at byte 24" : "[HID_LAYOUT] A-series: encoder at byte 28");
                     std::this_thread::sleep_for(std::chrono::milliseconds(800));
                     // REMOVED UNSAFE SpeakText FROM BACKGROUND THREAD
                     // SpeakText("Conectado"); 
@@ -1304,9 +1308,10 @@ void CSurf_SoundFirst::HandleHidReport(unsigned char* data) {
         }
     }
 
-    // Byte 28: Encoder Turn (Continuous Counter)
-    if (data[28] != old[28]) {
-        int delta = (int)((signed char)data[28] - (signed char)old[28]);
+    // Encoder Turn (Continuous Counter): byte 28 on A-series, 24 on M32
+    const int enc = m_encoder_byte;
+    if (data[enc] != old[enc]) {
+        int delta = (int)((signed char)data[enc] - (signed char)old[enc]);
         if (delta > 128) delta -= 256;
         else if (delta < -128) delta += 256;
         if (delta != 0) HandleEncoderRotation(delta);

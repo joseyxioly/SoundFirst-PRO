@@ -216,6 +216,8 @@ private:
     std::mutex m_hid_mutex;
     unsigned char m_last_hid_report[64];
     int m_last_knob_values[8];
+    // Encoder counter position: byte 28 on A-series, byte 24 on M32 (PID 1860).
+    int m_encoder_byte = 28;
 
     // NHL Actions
     std::map<std::string, std::string> m_nhl_actions;

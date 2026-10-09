@@ -1,24 +1,37 @@
-# SoundFirst PRO V2.0.1: first button press fix
+# SoundFirst PRO V2.0.1: two bug fixes
 
-## The bug
+This release fixes two bugs. Nothing else changed from V2.0.
+
+## Bug 1: the first button press was ignored
 
 After starting REAPER, the first button you pressed on the keyboard was
 ignored. Most people noticed it on Browser: you had to press it twice before
 SoundFirst said "Mode MIDI". Everything after that first press worked. It
 came back whenever the keyboard was disconnected and reconnected.
 
-## Why it happened
+**Why it happened.** The keyboard only sends data when something changes.
+SoundFirst treated the very first data it received as the "nothing pressed"
+starting point and did not act on it. Since that first data was usually your
+first button press, the press was used as the starting point instead of
+being handled.
 
-The keyboard only sends data when something changes. SoundFirst treated the
-very first data it received as the "nothing pressed" starting point and did
-not act on it. Since that first data was usually your first button press,
-the press was used as the starting point instead of being handled.
+**The fix.** SoundFirst still takes knob and encoder positions from that
+first data, so knobs don't jump. Buttons are now compared against "nothing
+pressed", so your first press works like every other one.
 
-## The fix
+## Bug 2: the encoder did nothing on the M32
 
-SoundFirst still takes knob and encoder positions from that first data, so
-knobs don't jump. Buttons are now compared against "nothing pressed", so your
-first press works like every other one. Nothing else changed from V2.0.
+On the Komplete Kontrol M32, turning the encoder did not reach SoundFirst.
+After pressing Browser you could not choose MIDI, Audio or Instrument, so
+Instrument mode could not be reached from the keyboard. Only the Komplete
+Kontrol software reacted to the encoder.
+
+**Why it happened.** Each keyboard model arranges its data a little
+differently. SoundFirst looked for the encoder where the A-series keeps it.
+The M32 keeps it in a different place, so SoundFirst never saw it move.
+
+**The fix.** SoundFirst now checks which keyboard is connected and reads the
+encoder from the right place. A-series keyboards work exactly as before.
 
 ## Upgrade
 

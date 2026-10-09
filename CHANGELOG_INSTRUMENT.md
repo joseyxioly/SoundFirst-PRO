@@ -18,6 +18,24 @@ knobs do not jump. Buttons (bytes 1-5) are compared against "nothing held",
 so a press in the first report is handled like any other press. This applies
 in every mode, including Instrument. A regression test covers it.
 
+## V2.0.1 bug fix: encoder ignored on M32 (2026-10-09)
+
+**Symptom.** On the Komplete Kontrol M32, turning the 4D encoder did nothing
+in SoundFirst. After pressing Browser, the encoder could not choose MIDI,
+Audio or Instrument, so Instrument mode could not be reached from the
+keyboard. Only the NI software reacted to the encoder.
+
+**Cause.** SoundFirst read the encoder counter from byte 28 of the HID
+report, which is where the A-series keeps it. The M32 sends a longer report
+with the counter at byte 24, and byte 28 is always zero. Confirmed with the
+HID capture action on an M32: three clicks right counted 1 to 4 at byte 24,
+three clicks left counted back to 1. Knob values and knob touch were already
+read from the right positions on the M32.
+
+**Fix.** When the HID connection opens, SoundFirst checks the keyboard model.
+M32 (PID 1860) reads the encoder from byte 24; A-series keyboards keep byte
+28. The log records which layout was chosen (`[HID_LAYOUT]`).
+
 ## Release preparation (r12, 2026-10-09)
 
 README and release notes explain native NKS control, the selected/armed-track
