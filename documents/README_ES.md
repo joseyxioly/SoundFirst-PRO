@@ -20,6 +20,36 @@ Hoy, comparte esta herramienta libremente con el mundo, con la esperanza de que 
 
 ---
 
+### Instrument Mode: Instrumentos NKS
+
+Como muchos lo han pedido, **¡SoundFirst PRO ahora es compatible con instrumentos NKS!**
+
+Toca tus instrumentos con los controles NKS nativos de Komplete Kontrol.  
+Después vuelve a tu mezcla o edita el MIDI que acabas de grabar.
+
+Instrument se suma como el quinto modo, junto a Mixer, Plugin, Audio y MIDI.
+
+1. Selecciona y arma la pista que contiene Komplete Kontrol.
+2. Pulsa **Browser**, gira el encoder para elegir **Instrument** y haz click en el encoder.
+3. Pulsa **Plugin** y después **Browser** para controlar Komplete Kontrol.
+4. Toca, explora presets o cambia de instrumento con los controles NKS nativos.
+5. Pulsa **Browser dos veces** para salir de Instrument y volver a SoundFirst.
+6. Desarma esa pista. Selecciona y arma la siguiente, y repite.
+
+Con varias instancias de Komplete Kontrol, **la pista armada toma el control** en este flujo.  
+Mantén esa misma pista seleccionada y solo esa pista armada.
+
+Instrument deja que Native Instruments controle el instrumento.  
+SoundFirst pausa sus controles personalizados hasta que salgas del modo.
+
+---
+
+### Instalación de la Nueva Versión
+
+Cierra REAPER, quita `reaper_kompletereaper.dll` si está instalado y copia `reaper_soundfirst_pro.dll` a `UserPlugins`; después abre REAPER de nuevo.
+
+---
+
 ### Por Qué Tu Estudio Necesita Esto
 
 *   **Feel Analógico Real (10-Bits):** Olvídate de los "saltos" del MIDI estándar (0-127). Hemos desbloqueado la resolución nativa de los encoders (0-1023) para que sientas cada matiz de tus filtros y compresión.
